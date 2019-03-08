@@ -3,7 +3,7 @@
 cnes_gui.server <- function(input, output, session) {
 
   # extract and import tiles kml
-  s2tiles <- s2_tiles()
+  s2tiles <- cnes::s2_tiles()
 
   # link to www directory and objects
   addResourcePath("www", system.file("www", package = "shinycnes"))
