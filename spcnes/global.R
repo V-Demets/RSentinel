@@ -12,7 +12,7 @@ options(shiny.maxRequestSize = mega * 1024^2)
 options(encoding = "UTF-8")
 
 # i18n
-i18n <- shiny.i18n::Translator$new(translation_json_path = system.file("translations/translation.json", package = "shinycnes"))
+i18n <- shiny.i18n::Translator$new(translation_json_path = system.file("translations/translation.json", package = "cnes"))
 i18n$set_translation_language("fr")
 
 
