@@ -5,14 +5,14 @@ pacman::p_load(
   rgdal, ggmap, ggplot2, reticulate, tools, leaflet.extras, pool, RPostgreSQL, devtools, mapedit, shiny.i18n, Cairo,
   stringr, shinyFiles, data.table, jsonlite, geojsonio, geojsonlint, imager, DBI
 )
-pacman::p_load_gh("hadley/tidyverse", "tidyverse/ggplot2", "tidyverse/dplyr", "r-spatial/sf", "jrowen/rhandsontable", "pobsteta/cnes")
+pacman::p_load_gh("hadley/tidyverse", "tidyverse/ggplot2", "tidyverse/dplyr", "r-spatial/sf", "jrowen/rhandsontable")
 
 mega <- 200
 options(shiny.maxRequestSize = mega * 1024^2)
 options(encoding = "UTF-8")
 
 # i18n
-i18n <- shiny.i18n::Translator$new(translation_json_path = system.file("translations/translation.json", package = "cnes"))
+i18n <- shiny.i18n::Translator$new(translation_json_path = system.file("translations/translation.json", package = "shiny-cnes"))
 i18n$set_translation_language("fr")
 
 

@@ -1,0 +1,50 @@
+Package: cnes
+Version: 0.9.9000
+Date: 2019-01-09
+Type: Package
+Title: Package to download space image from CNES server (theia, peps...)
+Depends: R (>= 3.0.0), pacman (>= 0.5.0)
+Imports:
+  reticulate,
+  methods,
+  digest,
+  stringr,
+  rgdal,
+  gdalUtils,
+  magrittr,
+  sp,
+  sf,
+  data.table,
+  raster,
+  XML,
+  jsonlite,
+  geojsonio,
+  leaflet,
+  leaflet.extras,
+  mapedit,
+  shiny,
+  shinyFiles,
+  shinydashboard,
+  shinyjs,
+  shinyWidgets,
+  foreach,
+  parallel,
+  doParallel,
+  units,
+  lwgeom,
+  shiny.i18n
+Suggests:
+  knitr,
+  rmarkdown
+Authors@R: person("Pascal", "Obstetar", email = "pascal.obstetar@gmail.com", role = c("aut", "cre"))
+Author: Pascal Obstetar [aut, cre]
+Maintainer: The package maintainer <pascal.obstetar@gmail.com>
+Description: Package to download space image from CNES server (theia, paps...).
+URL: https://github.com/pobsteta/cnes
+BugReports: https://github.com/pobsteta/cnes/issues
+License: GPL-3 + file LICENSE
+Encoding: UTF-8
+LazyData: true
+VignetteBuilder: knitr
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 6.1.1

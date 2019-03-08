@@ -1,0 +1,11 @@
+{
+  "gdalbuildvrt": ["/usr/bin/gdalbuildvrt"],
+  "gdal_translate": ["/usr/bin/gdal_translate"],
+  "gdalwarp": ["/usr/bin/gdalwarp"],
+  "gdal_calc": ["/usr/bin/gdal_calc.py"],
+  "gdal_merge": ["/usr/bin/gdal_merge.py"],
+  "gdal_polygonize": ["/usr/bin/gdal_polygonize.py"],
+  "gdaldem": ["/usr/bin/gdaldem"],
+  "gdalinfo": ["/usr/bin/gdalinfo"],
+  "ogrinfo": ["/usr/bin/ogrinfo"]
+}
