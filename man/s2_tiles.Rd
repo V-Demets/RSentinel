@@ -15,13 +15,6 @@ Load the vector object of the Sentinel-2 tiles.
 \note{
 License: GPL 3.0
 }
-\examples{
-s2tiles <- s2_tiles()
-\dontrun{
-s2tiles_fr <- s2tiles[grep("^3[01]T", s2tiles$tile_id), ]
-mapview::mapview(s2tiles_fr)
-}
-}
 \author{
-Luigi Ranghetti, phD (2018) \email{ranghetti.l@irea.cnr.it}
+Luigi Ranghetti, phD (2017) \email{ranghetti.l@irea.cnr.it}, pascal Obstetar, (2019) \email{pascal.obstetar@gmail.com}
 }

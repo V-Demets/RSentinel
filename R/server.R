@@ -3,7 +3,7 @@
 cnes_gui.server <- function(input, output, session) {
 
   # extract and import tiles kml
-  s2tiles <- cnes::s2_tiles()
+  s2tiles <- shinycnes::s2_tiles()
 
   # link to www directory and objects
   addResourcePath("www", system.file("www", package = "shinycnes"))
@@ -16,17 +16,14 @@ cnes_gui.server <- function(input, output, session) {
   rv <- reactiveValues()
 
   # get server volumes
-  volumes <- c("Home" = path.expand("~"), getVolumes()())
-
-  # initialise buffer
-  buffer <- 10
+  volumes <- c("Home" = path.expand("~"), shinyFiles::getVolumes()())
 
   #-- Function to update the map and the list of tiles --#
   # it returns TRUE if the input extent source was correctly read, FALSE elsewhere.
   # argument extent_source determines which source to be used:
   # "bbox", "vectfile", "draw" from selection buttons, "imported" from parameter;
   # in this case, the argument "custom_source" is the source to be passed.
-  update_extent <- function(extent_source, custom_source = NA) {
+  update_extent <- function(extent_source, custom_source = NA, map = "view_map") {
 
     # 1. Define rv$extent
     if (extent_source == "forest") {
@@ -53,6 +50,24 @@ cnes_gui.server <- function(input, output, session) {
       if (attr(rv$vectfile_polygon, "valid")) {
         rv$extent <- rv$vectfile_polygon
         attr(rv$extent, "new") <- TRUE
+      } else {
+        return(FALSE)
+      }
+    } else if (extent_source == "presabs") {
+      # Pointfile mode #
+      # check that the point is valid
+      if (attr(rv$vectfile_pa_point, "valid")) {
+        rv$extent_pa <- rv$vectfile_pa_point
+        attr(rv$extent_pa, "new") <- TRUE
+      } else {
+        return(FALSE)
+      }
+    } else if (extent_source == "mask") {
+      # Vectfile mode #
+      # check that the polygon is valid
+      if (attr(rv$vectfile_mask, "valid")) {
+        rv$extent_mask <- rv$vectfile_mask
+        attr(rv$extent_mask, "new") <- TRUE
       } else {
         return(FALSE)
       }
@@ -90,8 +105,43 @@ cnes_gui.server <- function(input, output, session) {
         return(FALSE)
       }
       rv$extent <- sel_imported_extent
+    } else if (extent_source == "importedmask") {
+      # Imported from parameters #
+      sel_imported_extent_mask <- if (is.null(custom_source) | anyNA(custom_source)) {
+        x <- st_polygon()
+        attr(x, "valid") <- FALSE
+        x
+      } else {
+        x <- st_read(custom_source, quiet = TRUE) %>%
+          st_transform(4326)
+        attr(x, "valid") <- TRUE
+        attr(x, "new") <- TRUE
+        x
+      }
+      if (!attr(sel_imported_extent_mask, "valid")) {
+        return(FALSE)
+      }
+      rv$extent_mask <- sel_imported_extent_mask
+    } else if (extent_source == "importedpa") {
+      # Imported from parameters #
+      sel_imported_extent_pa <- if (is.null(custom_source) | anyNA(custom_source)) {
+        x <- st_point()
+        attr(x, "valid") <- FALSE
+        x
+      } else {
+        x <- st_read(custom_source, quiet = TRUE) %>%
+          st_transform(4326)
+        attr(x, "valid") <- TRUE
+        attr(x, "new") <- TRUE
+        x
+      }
+      if (!attr(sel_imported_extent_pa, "valid")) {
+        return(FALSE)
+      }
+      rv$extent_pa <- sel_imported_extent_pa
     } else {
-      # For any other value of extent_source, use the existing rv$extent
+      # For any other value of extent_source, use the existing rv$extent and
+      # rv$extent_pa
       if (is.null(rv$extent)) {
         return(FALSE)
       } else if (!attr(rv$extent, "valid")) {
@@ -99,127 +149,270 @@ cnes_gui.server <- function(input, output, session) {
       } else {
         attr(rv$extent, "new") <- FALSE
       }
-    }
-
-    # 2. Update the list of overlapping tiles and the tiles on the map
-    if (length(rv$extent) > 0) {
-      rv$draw_tiles_overlapping <- s2tiles[unique(unlist(suppressMessages(st_intersects(st_transform(rv$extent, 4326), s2tiles)))), ]
-
-      if (attr(rv$extent, "new")) {
-        # update the list of tiles
-        updateCheckboxGroupInput(
-          session, "tiles_checkbox",
-          choiceNames = lapply(rv$draw_tiles_overlapping$tile_id, span, style = "family:monospace;"),
-          choiceValues = rv$draw_tiles_overlapping$tile_id,
-          selected = rv$draw_tiles_overlapping$tile_id,
-          inline = nrow(rv$draw_tiles_overlapping) > 8 # inline if they are many
-        )
+      if (is.null(rv$extent_pa)) {
+        return(FALSE)
+      } else if (!attr(rv$extent_pa, "valid")) {
+        return(FALSE)
+      } else {
+        attr(rv$extent_pa, "new") <- FALSE
       }
-
-      # reset and update the map
-      react_map(base_map())
-      rv$draw_tiles_overlapping_ll <- st_transform(rv$draw_tiles_overlapping, 4326)
-      rv$extent_ll <- st_transform(rv$extent, 4326)
-      leafletProxy("view_map") %>%
-        clearShapes() %>%
-        fitBounds(
-          lng1 = min(st_coordinates(rv$draw_tiles_overlapping_ll)[, "X"]),
-          lat1 = min(st_coordinates(rv$draw_tiles_overlapping_ll)[, "Y"]),
-          lng2 = max(st_coordinates(rv$draw_tiles_overlapping_ll)[, "X"]),
-          lat2 = max(st_coordinates(rv$draw_tiles_overlapping_ll)[, "Y"])
-        ) %>%
-        addPolygons(
-          data = rv$draw_tiles_overlapping,
-          group = "S2 tiles",
-          label = ~tile_id,
-          labelOptions = labelOptions(noHide = TRUE, direction = "auto"),
-          fill = TRUE,
-          fillColor = "orange",
-          fillOpacity = .3,
-          stroke = TRUE,
-          weight = 3,
-          color = "red"
-        ) %>%
-        # add extent
-        addPolygons(
-          data = rv$extent_ll,
-          group = "Extent",
-          # label = ~ccod_frt,
-          # labelOptions = labelOptions(noHide = TRUE, direction = "auto"),
-          fill = TRUE,
-          fillColor = "blue",
-          fillOpacity = .3,
-          stroke = TRUE,
-          weight = 3,
-          color = "darkgreen"
-        ) # %>%
-    } else {
-      rv$draw_tiles_overlapping <- NULL
-      # empty the list of tiles
-      updateCheckboxGroupInput(session, "tiles_checkbox",
-        choices = NULL
-      )
-      # reset the map
-      react_map(base_map())
     }
+
+    # 2. Update the list of overlapping tiles and the tiles on the map view_map
+    if (map == "view_map") {
+      if (length(rv$extent) > 0) {
+        rv$draw_tiles_overlapping <- s2tiles[unique(unlist(suppressMessages(st_intersects(st_transform(rv$extent, 4326), s2tiles)))), ]
+  
+        if (attr(rv$extent, "new")) {
+          # update the list of tiles
+          updateCheckboxGroupInput(
+            session, "tiles_checkbox",
+            choiceNames = lapply(rv$draw_tiles_overlapping$tile_id, span, style = "family:monospace;"),
+            choiceValues = rv$draw_tiles_overlapping$tile_id,
+            selected = rv$draw_tiles_overlapping$tile_id,
+            inline = nrow(rv$draw_tiles_overlapping) > 8 # inline if they are many
+          )
+        }
+  
+        # reset and update the map
+        react_map(base_map())
+        rv$draw_tiles_overlapping_ll <- st_transform(rv$draw_tiles_overlapping, 4326)
+        rv$extent_ll <- st_transform(rv$extent, 4326)
+        leafletProxy("view_map") %>%
+          clearShapes() %>%
+          fitBounds(
+            lng1 = min(st_coordinates(rv$draw_tiles_overlapping_ll)[, "X"]),
+            lat1 = min(st_coordinates(rv$draw_tiles_overlapping_ll)[, "Y"]),
+            lng2 = max(st_coordinates(rv$draw_tiles_overlapping_ll)[, "X"]),
+            lat2 = max(st_coordinates(rv$draw_tiles_overlapping_ll)[, "Y"])
+          ) %>%
+          addPolygons(
+            data = rv$draw_tiles_overlapping,
+            group = "S2 tiles",
+            label = ~tile_id,
+            labelOptions = labelOptions(noHide = TRUE, direction = "auto"),
+            fill = TRUE,
+            fillColor = "orange",
+            fillOpacity = .3,
+            stroke = TRUE,
+            weight = 3,
+            color = "red"
+          ) %>%
+          # add extent
+          addPolygons(
+            data = rv$extent_ll,
+            group = "Extent",
+            # label = ~ccod_frt,
+            # labelOptions = labelOptions(noHide = TRUE, direction = "auto"),
+            fill = TRUE,
+            fillColor = "blue",
+            fillOpacity = .3,
+            stroke = TRUE,
+            weight = 3,
+            color = "darkgreen"
+          )
+      } else {
+        rv$draw_tiles_overlapping <- NULL
+        # empty the list of tiles
+        updateCheckboxGroupInput(session, "tiles_checkbox",
+          choices = NULL
+        )
+        # reset the map
+        react_map(base_map())
+      }
+    } else if (map == "view_map_presabs") {
+      if (length(rv$extent_pa) > 0) {
+        # reset and update the map view_map_presabs
+        react_map_presabs(base_map(map = "view_map_presabs"))
+        rv$extent_pa_ll <- st_transform(rv$extent_pa, 4326)
+        
+        leafletProxy("view_map_presabs") %>%
+          fitBounds(
+            lng1 = min(st_coordinates(rv$extent_pa_ll)[, "X"]),
+            lat1 = min(st_coordinates(rv$extent_pa_ll)[, "Y"]),
+            lng2 = max(st_coordinates(rv$extent_pa_ll)[, "X"]),
+            lat2 = max(st_coordinates(rv$extent_pa_ll)[, "Y"])
+          ) %>%
+          clearShapes() %>%
+          # add extent
+          addCircleMarkers(
+            data = rv$extent_pa_ll %>%
+              filter(obs == 0),
+            group = "Extent",
+            fill = TRUE,
+            fillColor = "green",
+            fillOpacity = .3,
+            stroke = TRUE,
+            weight = 3,
+            color = "darkgreen"
+          ) %>%
+          addCircleMarkers(
+            data = rv$extent_pa_ll %>%
+              filter(obs == 1),
+            group = "Extent",
+            fill = TRUE,
+            fillColor = "red",
+            fillOpacity = .3,
+            stroke = TRUE,
+            weight = 3,
+            color = "darkred"
+          )
+      }
+    } else if (map == "view_map_mask") {
+      if (length(rv$extent_mask) > 0) {
+        # reset and update the map view_map_mask
+        react_map_mask(base_map(map = "view_map_mask"))
+        rv$extent_mask_ll <- st_transform(rv$extent_mask, 4326)
+        
+        leafletProxy("view_map_mask") %>%
+          fitBounds(
+            lng1 = min(st_coordinates(rv$extent_mask_ll)[, "X"]),
+            lat1 = min(st_coordinates(rv$extent_mask_ll)[, "Y"]),
+            lng2 = max(st_coordinates(rv$extent_mask_ll)[, "X"]),
+            lat2 = max(st_coordinates(rv$extent_mask_ll)[, "Y"])
+          ) %>%
+          clearShapes() %>%
+          # add extent
+          addPolygons(
+            data = rv$extent_mask_ll,
+            group = "Extent",
+            fill = TRUE,
+            fillColor = "blue",
+            fillOpacity = .3,
+            stroke = TRUE,
+            weight = 3,
+            color = "darkgreen"
+          )
+      }
+    } else if (map == "view_map_prevision") {
+      react_map_prevision(base_map(map = "view_map_prevision"))
+      rf_predict_files <-  list.files(file.path(paste0(input$path_project_textin, "/projets/", input$project_name, "/pred/sdm")),
+                                      pattern = '\\.shp$',
+                                      full.names = TRUE,
+                                      recursive = TRUE)
+      rf_predict_tbl <- suppressMessages(
+        purrr::map(
+          rf_predict_files,
+          ~sf::st_read(., quiet = TRUE) %>%
+            st_transform(4326) %>%
+            st_coordinates() %>%
+            as_tibble() %>%
+            dplyr::select(X,Y) %>%
+            dplyr::filter(!is.na(X))) %>% 
+          magrittr::set_names(basename(dirname(rf_predict_files)))
+      )
+      
+      leaf <- leafletProxy("view_map_prevision")
+      
+      purrr::walk(
+        names(rf_predict_tbl),
+        function(day) {
+          leaf <<- leaf %>%
+            addHeatmap(
+              data = rf_predict_tbl[[day]],
+              layerId = day, group = day,
+              lng=~X, lat=~Y,
+              blur = 20, 
+              max = 0.05, 
+              radius = 10,
+              gradient = 'red')
+        }
+      )
+      
+      extent_pre_ll <- rf_predict_tbl[[1]]
+      
+      leaf %>%
+        fitBounds(
+          lng1 = min(extent_pre_ll$X),
+          lat1 = min(extent_pre_ll$Y),
+          lng2 = max(extent_pre_ll$X),
+          lat2 = max(extent_pre_ll$Y)
+        ) %>%
+        addLayersControl(
+          overlayGroups = names(rf_predict_tbl),
+          options = layersControlOptions(collapsed = FALSE)
+        )
+          
+    }
+    
     return(TRUE)
   }
 
   #-- Create the map (once) --#
-  base_map <- function() {
-    leaflet() %>%
-      # add tiles
-      addTiles(group = "OpenStreetMap") %>%
-      # addTiles(paste0("https://{s}.tile.thunderforest.com/outdoors/{z}/{x}/{y}.png",
-      #                 if (!is.na(thunderforest_api)) {paste0("?apikey=",thunderforest_api)}),
-      #          group = "OpenStreetMap Outdoors") %>%
-      # addProviderTiles(providers$OpenTopoMap, group = "OpenTopoMap") %>%
-      addTiles("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-        group = "OpenTopoMap"
-      ) %>%
-      # addProviderTiles(providers$CartoDB.Positron, group = "CartoDB") %>%
-      addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
-        group = "CartoDB"
-      ) %>%
-      # addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
-      addTiles("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        group = "Satellite"
-      ) %>%
-      # addProviderTiles(providers$CartoDB.PositronOnlyLabels, group = "Dark names") %>%
-      addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_only_labels/{z}/{x}/{y}.png",
-        group = "Light names"
-      ) %>%
-      # addProviderTiles(providers$CartoDB.DarkMatterOnlyLabels, group = "Dark names") %>%
-      addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_only_labels/{z}/{x}/{y}.png",
-        group = "Dark names"
-      ) %>%
-      # view and controls
-      addLayersControl(
-        baseGroups = c("OpenStreetMap", "OpenTopoMap", "CartoDB", "Satellite"),
-        overlayGroups = c("Light names", "Dark names", "Extent", "S2 tiles"),
-        options = layersControlOptions(collapsed = FALSE)
-      ) %>%
-      hideGroup(c("Light names", "Dark names"))
+  base_map <- function(map = "view_map") {
+    if (map == "view_map_presabs" || map == "view_map_mask") {
+      leaflet() %>%
+        # add tiles
+        addTiles(group = "OpenStreetMap") %>%
+        addTiles("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+          group = "OpenTopoMap"
+        ) %>%
+        addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
+          group = "CartoDB"
+        ) %>%
+        addTiles("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          group = "Satellite"
+        ) %>%
+        addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_only_labels/{z}/{x}/{y}.png",
+          group = "Light names"
+        ) %>%
+        addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_only_labels/{z}/{x}/{y}.png",
+          group = "Dark names"
+        ) %>%
+        # view and controls
+        addLayersControl(
+          baseGroups = c("OpenStreetMap", "OpenTopoMap", "CartoDB", "Satellite"),
+          overlayGroups = c("Light names", "Dark names", "Extent"),
+          options = layersControlOptions(collapsed = FALSE)
+        ) %>%
+        hideGroup(c("Light names", "Dark names"))
+    } else if (map == "view_map_prevision") {
+      leaflet() %>%
+        # addProviderTiles(providers$GeoportailFrance.orthos)
+        addProviderTiles(providers$Esri.WorldImagery)
+    } else {
+      leaflet() %>%
+        # add tiles
+        addTiles(group = "OpenStreetMap") %>%
+        addTiles("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+                 group = "OpenTopoMap"
+        ) %>%
+        addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
+                 group = "CartoDB"
+        ) %>%
+        addTiles("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                 group = "Satellite"
+        ) %>%
+        addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_only_labels/{z}/{x}/{y}.png",
+                 group = "Light names"
+        ) %>%
+        addTiles("https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_only_labels/{z}/{x}/{y}.png",
+                 group = "Dark names"
+        ) %>%
+        # view and controls
+        addLayersControl(
+          baseGroups = c("OpenStreetMap", "OpenTopoMap", "CartoDB", "Satellite"),
+          overlayGroups = c("Light names", "Dark names", "Extent", "S2 tiles"),
+          options = layersControlOptions(collapsed = FALSE)
+        ) %>%
+        hideGroup(c("Light names", "Dark names"))
+    }
   }
 
   # create a new map for principal view
-  react_map <- reactiveVal({
+  react_map <- reactiveVal(
     base_map()
-  })
+  )
   output$view_map <- renderLeaflet({
     react_map()
   })
   
-  # create a new map for prevision view
-  react_map_prevision <- reactiveVal(base_map())
-  output$view_map_prevision <- renderLeaflet({
-    react_map_prevision()
-  })
-
-  ############### - Forest mode -####################
+  ############### - Forest mode spatio-temporal -####################
 
   # create a new map (to be shown in modal dialog)
-  react_map_forest <- reactiveVal(base_map())
+  react_map_forest <- reactiveVal(
+    base_map()
+  )
   output$view_map_forest <- renderLeaflet({
     react_map_forest()
   })
@@ -307,7 +500,7 @@ cnes_gui.server <- function(input, output, session) {
   })
 
 
-  ############### - Bbox mode -####################
+  ############### - Bbox mode spatio-temporal -####################
 
   # message for bboxproj
   output$bboxproj_message <- renderUI({
@@ -338,7 +531,9 @@ cnes_gui.server <- function(input, output, session) {
   })
 
   # create a new map (to be shown in modal dialog)
-  react_map_bbox <- reactiveVal(base_map())
+  react_map_bbox <- reactiveVal(
+    base_map()
+  )
   output$view_map_bbox <- renderLeaflet({
     react_map_bbox()
   })
@@ -440,9 +635,8 @@ cnes_gui.server <- function(input, output, session) {
     })
   })
 
-  ############# - Vector file mode -###############
+  ############# - Vector file mode spatio-temporal -###############
 
-  # if
   observeEvent(input$path_vectfile_sel, {
     uploaded_exts <- gsub("^.+\\.(.+)$", "\\1", input$path_vectfile_sel$name)
     # checks
@@ -491,7 +685,9 @@ cnes_gui.server <- function(input, output, session) {
   })
 
   # create a new map (to be shown in modal dialog)
-  react_map_vectfile <- reactiveVal(base_map())
+  react_map_vectfile <- reactiveVal(
+    base_map()
+  )
   output$view_map_vectfile <- renderLeaflet({
     react_map_vectfile()
   })
@@ -542,7 +738,7 @@ cnes_gui.server <- function(input, output, session) {
           stroke = TRUE,
           weight = 3,
           color = "darkgreen"
-        ) # %>%
+        )
     } else {
       # if the vector is not valid, reset the map
       react_map_vectfile(base_map())
@@ -572,7 +768,7 @@ cnes_gui.server <- function(input, output, session) {
   })
 
 
-  ################### - Draw mode -######################"
+  ################### - Draw mode spatio-temporal -######################"
 
   # Open modal dialog to edit bbox
   observeEvent(input$button_extent_draw, {
@@ -610,10 +806,40 @@ cnes_gui.server <- function(input, output, session) {
   })
 
 
-  #- Refresh the map if required -#
+  #- Refresh the extent map if required -#
   observeEvent(input$button_refresh_map, {
     withProgress(message = "Refreshing the map", value = 0, {
-      update_extent(extent_source = "fake")
+      update_extent(extent_source = "fake", map = "view_map")
+      for (i in 1:10) {
+        incProgress(1 / 10)
+        Sys.sleep(0.1)
+      }
+    })
+  })
+  
+  observeEvent(input$button_refresh_map_pa, {
+    withProgress(message = "Refreshing the map", value = 0, {
+      update_extent(extent_source = "fake", map = "view_map_presabs")
+      for (i in 1:10) {
+        incProgress(1 / 10)
+        Sys.sleep(0.1)
+      }
+    })
+  })
+  
+  observeEvent(input$button_refresh_map_mask, {
+    withProgress(message = "Refreshing the map", value = 0, {
+      update_extent(extent_source = "fake", map = "view_map_mask")
+      for (i in 1:10) {
+        incProgress(1 / 10)
+        Sys.sleep(0.1)
+      }
+    })
+  })
+  
+  observeEvent(input$button_refresh_map_prevision, {
+    withProgress(message = "Refreshing the map", value = 0, {
+      update_extent(extent_source = "fake", map = "view_map_prevision")
       for (i in 1:10) {
         incProgress(1 / 10)
         Sys.sleep(0.1)
@@ -621,7 +847,295 @@ cnes_gui.server <- function(input, output, session) {
     })
   })
 
-  ######## end of extent module ############
+  ######## end of extent module spatio-temporal ############
+  
+  ######## extent module pa ############
+  
+  # create a new map for view_map_presabs
+  react_map_presabs <- reactiveVal(
+    base_map(map = "view_map_presabs")
+  )
+  output$view_map_presabs <- renderLeaflet({
+    react_map_presabs()
+  })
+  
+  observeEvent(input$path_vectfile_pa_sel, {
+    uploaded_exts <- gsub("^.+\\.(.+)$", "\\1", input$path_vectfile_pa_sel$name)
+    # checks
+    if (length(unique(gsub("\\..+$", "", input$path_vectfile_pa_sel$name))) > 1) {
+      # if more than one vector were chosen, give an alert and do not use the file
+      sendSweetAlert(
+        session,
+        title = "Invalid vector",
+        text = paste(
+          "Please select a single vector",
+          "(multiple selection is allowed only for shapefiles)."
+        ),
+        type = "error",
+        btn_labels = "Ok"
+      )
+      rv$vectfile_pa_path <- ""
+    } else if (length(uploaded_exts) == 1 && !uploaded_exts %in% c("shp", "shx", "dbf", "prj")) {
+      # if a single file was chosen and it is not a shapefile, use it
+      rv$vectfile_pa_path <- input$path_vectfile_pa_sel$datapath
+    } else if (anyNA(match(c("shp", "shx", "dbf", "prj"), uploaded_exts))) {
+      # if a shapefile was chosen but some files are missing, do not use it
+      sendSweetAlert(
+        session,
+        title = "Incomplete shapefile",
+        text = paste(
+          "Please select all the files of the shapefile",
+          "(at most .shp, .shx, .prj, .dbf)."
+        ),
+        type = "error",
+        btn_labels = "Ok"
+      )
+      rv$vectfile_pa_path <- ""
+    } else {
+      # if a shapefile was chosen and all the files are present,
+      # rename the uploaded files in order to have the same filename and use them
+      path_vectfile_pa_sel_new_datapath <- file.path(
+        dirname(input$path_vectfile_pa_sel$datapath), input$path_vectfile_pa_sel$name
+      )
+      for (i in seq_len(nrow(input$path_vectfile_pa_sel))) {
+        file.rename(input$path_vectfile_pa_sel$datapath[i], path_vectfile_pa_sel_new_datapath[i])
+      }
+      rv$vectfile_pa_path <- path_vectfile_pa_sel_new_datapath[
+        input$path_vectfile_pa_sel$type == "application/x-esri-shape"
+        ]
+    }
+  })
+  
+  # create a new map for presence absence view
+  react_map_vectfile_pa <- reactiveVal(
+    base_map(map = "view_map_presabs")
+  )
+  output$view_map_vectfile_pa <- renderLeaflet({
+    react_map_vectfile_pa()
+  })
+  
+  # Open modal dialog to load the vector file
+  observeEvent(input$button_extent_vectfile_pa, {
+    rv$vectfile_path_pa <- ""
+    showModal(load_extent_vectfile_pa())
+  })
+  
+  # load the vector on the map
+  observeEvent(rv$vectfile_pa_path, {
+    
+    # Check that the vector is valid
+    rv$vectfile_pa_point <- tryCatch({
+      x <- st_read(rv$vectfile_pa_path, quiet = TRUE) %>%
+        st_transform(4326)
+      attr(x, "valid") <- TRUE
+      attr(x, "new") <- TRUE
+      x
+    },
+    error = function(e) {
+      x <- st_point()
+      attr(x, "valid") <- FALSE
+      x
+    }
+    )
+    
+    if (attr(rv$vectfile_pa_point, "valid")) {
+      # if the vector is valid, update the map
+      leafletProxy("view_map_vectfile_pa") %>%
+        clearShapes() %>%
+        fitBounds(
+          lng1 = min(st_coordinates(rv$vectfile_pa_point)[, "X"]),
+          lat1 = min(st_coordinates(rv$vectfile_pa_point)[, "Y"]),
+          lng2 = max(st_coordinates(rv$vectfile_pa_point)[, "X"]),
+          lat2 = max(st_coordinates(rv$vectfile_pa_point)[, "Y"])
+        ) %>%
+        addCircleMarkers(
+          data = rv$vectfile_pa_point %>%
+            filter(obs == 1), 
+          color= "red") %>%
+        addCircleMarkers(
+          data = rv$vectfile_pa_point %>%
+            filter(obs == 0), 
+          color= "green") 
+    } else {
+      # if the vector is not valid, reset the map
+      react_map_vectfile_pa(base_map(map = "view_map_presabs"))
+    }
+  })
+  
+  # use bbox
+  observeEvent(input$save_extent_vectfile_pa, {
+    withProgress(message = "Creating the extent", value = 0, {
+      vectfile_pa_valid <- update_extent(extent_source = "presabs", map = "view_map_presabs")
+      if (vectfile_pa_valid) {
+        removeModal()
+      } else {
+        sendSweetAlert(
+          session,
+          title = "Please specify a valid vector file.",
+          text = NULL,
+          type = "error",
+          btn_labels = "Ok"
+        )
+      }
+      for (i in 1:10) {
+        incProgress(1 / 10)
+        Sys.sleep(0.1)
+      }
+    })
+  })
+  ######## end of extent module pa ############
+  
+  ######## extent module mask ############
+  
+  # create a new map for prevision view
+  react_map_mask <- reactiveVal(
+    base_map(map = "view_map_presabs")
+  )
+  output$view_map_mask <- renderLeaflet({
+    react_map_mask()
+  })
+
+  observeEvent(input$path_vectfile_mask_sel, {
+    uploaded_exts <- gsub("^.+\\.(.+)$", "\\1", input$path_vectfile_mask_sel$name)
+    # checks
+    if (length(unique(gsub("\\..+$", "", input$path_vectfile_mask_sel$name))) > 1) {
+      # if more than one vector were chosen, give an alert and do not use the file
+      sendSweetAlert(
+        session,
+        title = "Invalid vector",
+        text = paste(
+          "Please select a single vector",
+          "(multiple selection is allowed only for shapefiles)."
+        ),
+        type = "error",
+        btn_labels = "Ok"
+      )
+      rv$vectfile_mask_path <- ""
+    } else if (length(uploaded_exts) == 1 && !uploaded_exts %in% c("shp", "shx", "dbf", "prj")) {
+      # if a single file was chosen and it is not a shapefile, use it
+      rv$vectfile_mask_path <- input$path_vectfile_mask_sel$datapath
+    } else if (anyNA(match(c("shp", "shx", "dbf", "prj"), uploaded_exts))) {
+      # if a shapefile was chosen but some files are missing, do not use it
+      sendSweetAlert(
+        session,
+        title = "Incomplete shapefile",
+        text = paste(
+          "Please select all the files of the shapefile",
+          "(at most .shp, .shx, .prj, .dbf)."
+        ),
+        type = "error",
+        btn_labels = "Ok"
+      )
+      rv$vectfile_mask_path <- ""
+    } else {
+      # if a shapefile was chosen and all the files are present,
+      # rename the uploaded files in order to have the same filename and use them
+      path_vectfile_mask_sel_new_datapath <- file.path(
+        dirname(input$path_vectfile_mask_sel$datapath), input$path_vectfile_mask_sel$name
+      )
+      for (i in seq_len(nrow(input$path_vectfile_mask_sel))) {
+        file.rename(input$path_vectfile_mask_sel$datapath[i], path_vectfile_mask_sel_new_datapath[i])
+      }
+      rv$vectfile_mask_path <- path_vectfile_mask_sel_new_datapath[
+        input$path_vectfile_mask_sel$type == "application/x-esri-shape"
+        ]
+    }
+  })
+
+  # create a new map for mask view
+  react_map_vectfile_mask <- reactiveVal(
+    base_map(map = "view_map_mask")
+  )
+  output$view_map_vectfile_mask <- renderLeaflet({
+    react_map_vectfile_mask()
+  })
+
+  # Open modal dialog to load the vector file
+  observeEvent(input$button_extent_vectfile_mask, {
+    rv$vectfile_path_mask <- ""
+    showModal(load_extent_vectfile_mask())
+  })
+
+  # load the vector on the map
+  observeEvent(rv$vectfile_mask_path, {
+
+    # Check that the vector is valid
+    rv$vectfile_mask <- tryCatch({
+      x <- st_read(rv$vectfile_mask_path, quiet = TRUE) %>%
+        st_transform(4326)
+      attr(x, "valid") <- TRUE
+      attr(x, "new") <- TRUE
+      x
+    },
+    error = function(e) {
+      x <- st_polygon()
+      attr(x, "valid") <- FALSE
+      x
+    }
+    )
+
+    if (attr(rv$vectfile_mask, "valid")) {
+      # if the vector is valid, update the map
+      rv$vectfile_mask_ll <- st_transform(rv$vectfile_mask, 4326)
+      leafletProxy("view_map_vectfile_mask") %>%
+        clearShapes() %>%
+        fitBounds(
+          lng1 = min(st_coordinates(rv$vectfile_mask_ll)[, "X"]),
+          lat1 = min(st_coordinates(rv$vectfile_mask_ll)[, "Y"]),
+          lng2 = max(st_coordinates(rv$vectfile_mask_ll)[, "X"]),
+          lat2 = max(st_coordinates(rv$vectfile_mask_ll)[, "Y"])
+        ) %>%
+        addPolygons(
+          data = rv$vectfile_mask_ll,
+          group = "Extent",
+          fill = TRUE,
+          fillColor = "green",
+          fillOpacity = .3,
+          stroke = TRUE,
+          weight = 3,
+          color = "darkgreen"
+        )
+    } else {
+      # if the vector is not valid, reset the map
+      react_map_vectfile_mask(base_map(map = "view_map_mask"))
+    }
+  })
+
+  # use bbox
+  observeEvent(input$save_extent_vectfile_mask, {
+    withProgress(message = "Creating the extent", value = 0, {
+      vectfile_mask_valid <- update_extent(extent_source = "mask", map = "view_map_mask")
+      if (vectfile_mask_valid) {
+        removeModal()
+      } else {
+        sendSweetAlert(
+          session,
+          title = "Please specify a valid vector file.",
+          text = NULL,
+          type = "error",
+          btn_labels = "Ok"
+        )
+      }
+      for (i in 1:10) {
+        incProgress(1 / 10)
+        Sys.sleep(0.1)
+      }
+    })
+  })
+  
+  ######## end of extent module mask 
+  
+  ######## extent module prevision ############
+
+  # create a new map for prevision view
+  react_map_prevision <- reactiveVal(
+    base_map(map = "view_map_prevision")
+  )
+  output$view_map_prevision <- renderLeaflet({
+    react_map_prevision()
+  })
+  
+  ######## end of extent module prevision ############
 
   ####### message help #############
   observeEvent(input$help_time_period, {
@@ -938,6 +1452,15 @@ cnes_gui.server <- function(input, output, session) {
     } else {
       NA
     } # path of entire tiled products
+    rl$path_pred <- if (rl$project_name != "") {
+      res <- paste0(input$path_project_textin, "/projets/", input$project_name, "/pred/sdm")
+      if (!dir.exists(res)) {
+        dir.create(res, showWarnings = FALSE, recursive = TRUE)
+      }
+      res
+    } else {
+      NA
+    } # path of entire pred products
     rl$path_mosaic <- if (rl$project_name != "") {
       res <- paste0(input$path_project_textin, "/mosaic")
       if (!dir.exists(res)) {
@@ -965,6 +1488,15 @@ cnes_gui.server <- function(input, output, session) {
     } else {
       NA
     } # path of merged tiled products
+    rl$path_tif <- if (rl$project_name != "") {
+      res <- paste0(input$path_project_textin, "/projets/", input$project_name, "/tif")
+      if (!dir.exists(res)) {
+        dir.create(res, showWarnings = FALSE)
+      }
+      res
+    } else {
+      NA
+    } # path of tif products
     rl$path_warped <- if (rl$project_name != "") {
       res <- paste0(input$path_project_textin, "/warped")
       if (!dir.exists(res)) {
@@ -975,7 +1507,7 @@ cnes_gui.server <- function(input, output, session) {
       NA
     } # path of warped tiled products
     rl$path_masked <- if (rl$project_name != "") {
-      res <- paste0(input$path_project_textin, "/projets/", input$project_name, "/masked")
+      res <- paste0(input$path_project_textin, "/masked")
       if (!dir.exists(res)) {
         dir.create(res, showWarnings = FALSE)
       }
@@ -993,9 +1525,10 @@ cnes_gui.server <- function(input, output, session) {
       NA
     } # path of output products
     rl$path_rgb <- if (rl$project_name != "") {
-      res <- paste0(input$path_project_textin, "/projets/", input$project_name, "/rgb")
-      res2 <- paste0(res, "/jpg")
-      if (!dir.exists(res)) {
+      res <- paste0(input$path_project_textin, "/rgb")
+      res2 <- paste0(input$path_project_textin, "/projets/", input$project_name, "/rgb/jpg")
+      if (!dir.exists(res) | !dir.exists(res2)) {
+        dir.create(res, showWarnings = FALSE, recursive = TRUE)
         dir.create(res2, showWarnings = FALSE, recursive = TRUE)
       }
       res
@@ -1003,9 +1536,10 @@ cnes_gui.server <- function(input, output, session) {
       NA
     } # path of rgb products
     rl$path_indices <- if (rl$project_name != "") {
-      res <- paste0(input$path_project_textin, "/projets/", input$project_name, "/indices")
-      res2 <- paste0(res, "/jpg")
-      if (!dir.exists(res)) {
+      res <- paste0(input$path_project_textin, "/indices")
+      res2 <- paste0(input$path_project_textin, "/projets/", input$project_name, "/indices/jpg")
+      if (!dir.exists(res) | !dir.exists(res2)) {
+        dir.create(res, showWarnings = FALSE, recursive = TRUE)
         dir.create(res2, showWarnings = FALSE, recursive = TRUE)
       }
       res
@@ -1070,9 +1604,27 @@ cnes_gui.server <- function(input, output, session) {
       "full"
     }
 
-    # polygons
+    # polygons extent
     rl$extent <- if (input$query_space == TRUE & !is.null(rv$extent)) {
       rv$extent %>%
+        st_transform(4326) %>%
+        geojson_json(pretty = TRUE)
+    } else {
+      NA
+    }
+    
+    # polygons extent_pa
+    rl$extent_pa <- if (input$query_space == TRUE & !is.null(rv$extent_pa)) {
+      rv$extent_pa %>%
+        st_transform(4326) %>%
+        geojson_json(pretty = TRUE)
+    } else {
+      NA
+    }
+    
+    # polygons extent_mask
+    rl$extent_mask <- if (input$query_space == TRUE & !is.null(rv$extent_mask)) {
+      rv$extent_mask %>%
         st_transform(4326) %>%
         geojson_json(pretty = TRUE)
     } else {
@@ -1246,7 +1798,9 @@ cnes_gui.server <- function(input, output, session) {
       # update extent (at the end, not to interfer with other events
       # (the delay is required to update the map after the map is charged)
       shinyjs::delay(5E3, {
-        update_extent("imported", custom_source = pl$extent)
+        update_extent(extent_source = "imported", custom_source = pl$extent)
+        update_extent(extent_source = "importedpa", custom_source = pl$extent_pa)
+        update_extent(extent_source = "importedmask", custom_source = pl$extent_mask)
         updateCheckboxGroupInput(session, "tiles_checkbox",
           selected = pl$s2tiles_selected
         )
@@ -1255,7 +1809,7 @@ cnes_gui.server <- function(input, output, session) {
     })
   }
 
-  # build the modal dialog
+  # build the modal dialog preprocessing
   cnes_download_modal <- reactive({
     modalDialog(
       title = i18n$t("Download products"),
@@ -1265,62 +1819,23 @@ cnes_gui.server <- function(input, output, session) {
       footer = NULL
     )
   })
-
-  # if "Press to launch calc" is pressend, return values
-  observeEvent(input$goButton, {
-    showModal(cnes_download_modal())
-
-    # create the text to show in the modaldialog
-    shinyjs::html(
-      "cnes_download_message",
-      as.character(div(
-        align = "center",
-        p(i18n$t("Patience")),
-        p(
-          style = "text-align:center;font-size:500%;color:darkgrey;",
-          icon("spinner", class = "fa-pulse")
-        )
-      ))
-    )
-
-    isolate({
-      withCallingHandlers({
-        shinyjs::html(id = "text00", html = " ")
-        return_list <- create_return_list() # run creation of return_list
-        check_param_result <- check_param(return_list)
-        if (check_param_result) {
-          # shinyjs::js$closeWindow()
-          cnes(return_list)
-        }
-        # return_list
-      },
-      message = function(m) {
-        shinyjs::html(id = "cnes_download_message", html = paste(m$message, "<br>"), add = TRUE)
-      },
-      warning = function(m) {
-        shinyjs::html(id = "text00", html = m$message, add = TRUE)
-      }
-      )
-    })
-
-    shinyjs::html(
-      "cnes_download_message",
-      as.character(div(
-        p(i18n$t("Thank you for your patience\u0021")),
-        div(
-          style = "text-align:right;",
-          modalButton(i18n$t("\u2000Close"), icon = icon("check"))
-        )
-      )),
-      add = TRUE
+  
+  # build the modal dialog prediction
+  cnes_prediction_modal <- reactive({
+    modalDialog(
+      title = i18n$t("Prediction"),
+      size = "s",
+      uiOutput("cnes_prediction_message"),
+      easyClose = FALSE,
+      footer = NULL
     )
   })
 
   #### image list indices ####
   limageind <- reactive({
-    if (!is.null(paste0(input$path_project_textin, "/", input$project_name))) {
+    if (!is.null(paste0(input$path_project_textin, "/projets/", input$project_name))) {
       limageind <- list()
-      limageind <- grep(list.files(paste0(input$path_project_textin, "/", input$project_name, "/indices/jpg")), pattern = ".jpg.aux.xml", invert = TRUE, value = TRUE)
+      limageind <- grep(list.files(paste0(input$path_project_textin, "/projets/", input$project_name, "/indices/jpg")), pattern = ".jpg.aux.xml", invert = TRUE, value = TRUE)
       names(limageind) <- basename(limageind)
       limageind
     } else {
@@ -1328,15 +1843,10 @@ cnes_gui.server <- function(input, output, session) {
     }
   })
 
-  # list image
-  observeEvent(c(input$path_project_textin, input$project_name), {
-    updateSelectInput(session, "listimage03", choices = c("Choose a picture" = "", limageind()))
-  })
-
   # image
   output$image03 <- renderImage({
-    if (!is.null(paste0(input$path_project_textin, "/", input$project_name))) {
-      src <- paste0(input$path_project_textin, "/", input$project_name, "/indices/jpg/", input$listimage03)
+    if (!is.null(paste0(input$path_project_textin, "/projets/", input$project_name))) {
+      src <- paste0(input$path_project_textin, "/projets/", input$project_name, "/indices/jpg/", input$listimage03)
     } else {
       src <- tempfile(fileext = ".jpg")
     }
@@ -1351,9 +1861,9 @@ cnes_gui.server <- function(input, output, session) {
 
   #### image list RGB ####
   limagergb <- reactive({
-    if (!is.null(paste0(input$path_project_textin, "/", input$project_name))) {
+    if (!is.null(paste0(input$path_project_textin, "/projets/", input$project_name))) {
       limagergb <- list()
-      limagergb <- grep(list.files(paste0(input$path_project_textin, "/", input$project_name, "/rgb/jpg")), pattern = ".jpg.aux.xml", invert = TRUE, value = TRUE)
+      limagergb <- grep(list.files(paste0(input$path_project_textin, "/projets/", input$project_name, "/rgb/jpg")), pattern = ".jpg.aux.xml", invert = TRUE, value = TRUE)
       names(limagergb) <- basename(limagergb)
       limagergb
     } else {
@@ -1368,8 +1878,8 @@ cnes_gui.server <- function(input, output, session) {
 
   # image
   output$image02 <- renderImage({
-    if (!is.null(paste0(input$path_project_textin, "/", input$project_name))) {
-      src <- paste0(input$path_project_textin, "/", input$project_name, "/rgb/jpg/", input$listimage02)
+    if (!is.null(paste0(input$path_project_textin, "/projets/", input$project_name))) {
+      src <- paste0(input$path_project_textin, "/projets/", input$project_name, "/rgb/jpg/", input$listimage02)
     } else {
       src <- tempfile(fileext = ".jpg")
     }
@@ -1419,6 +1929,122 @@ cnes_gui.server <- function(input, output, session) {
       alt = i18n$t("Sentinel image")
     ))
   }, deleteFile = FALSE)
+  
+  # if "Press to Starts preprocessing" is pressend, return values
+  observeEvent(input$goPreprocessing, {
+    showModal(cnes_download_modal())
+    
+    # create the text to show in the modaldialog
+    shinyjs::html(
+      "cnes_download_message",
+      as.character(div(
+        align = "center",
+        p(i18n$t("Patience")),
+        p(
+          style = "text-align:center;font-size:500%;color:darkgrey;",
+          icon("spinner", class = "fa-pulse")
+        )
+      ))
+    )
+    
+    isolate({
+      withCallingHandlers({
+        shinyjs::html(id = "text00", html = " ")
+        return_list <- create_return_list() # run creation of return_list
+        check_param_result <- check_param(return_list)
+        if (check_param_result) {
+          # shinyjs::js$closeWindow()
+          preprocessing(return_list)
+        }
+        # return_list
+      },
+      message = function(m) {
+        shinyjs::html(id = "cnes_download_message", html = paste(m$message, "<br>"), add = TRUE)
+      },
+      warning = function(m) {
+        shinyjs::html(id = "text00", html = m$message, add = TRUE)
+      }
+      )
+    })
+    
+    shinyjs::html(
+      "cnes_download_message",
+      as.character(div(
+        p(i18n$t("Thank you for your patience\u0021")),
+        div(
+          style = "text-align:right;",
+          modalButton(i18n$t("\u2000Close"), icon = icon("check"))
+        )
+      )),
+      add = TRUE
+    )
+    
+    # update tiles list
+    updateSelectInput(session, "listimage01", choices = c("Choose a picture" = "", limage()))
+    updateSelectInput(session, "listimage02", choices = c("Choose a picture" = "", limagergb()))
+    updateSelectInput(session, "listimage03", choices = c("Choose a picture" = "", limageind()))
+  })
+  
+  # if "Press to Starts prediction" is pressend, return values
+  observeEvent(input$goPrediction, {
+    showModal(cnes_prediction_modal())
+    
+    # create the text to show in the modaldialog
+    shinyjs::html(
+      "cnes_prediction_message",
+      as.character(div(
+        align = "center",
+        p(i18n$t("Patience")),
+        p(
+          style = "text-align:center;font-size:500%;color:darkgrey;",
+          icon("spinner", class = "fa-pulse")
+        )
+      ))
+    )
+    
+    isolate({
+      withCallingHandlers({
+        shinyjs::html(id = "text00", html = " ")
+        return_list <- create_return_list() # run creation of return_list
+        check_param_result <- check_param(return_list)
+        if (check_param_result) {
+          # shinyjs::js$closeWindow()
+          prediction(param_list = return_list)
+        }
+        # return_list
+      },
+      message = function(m) {
+        shinyjs::html(id = "cnes_prediction_message", html = paste(m$message, "<br>"), add = TRUE)
+      },
+      warning = function(m) {
+        shinyjs::html(id = "text00", html = m$message, add = TRUE)
+      }
+      )
+    })
+    
+    shinyjs::html(
+      "cnes_prediction_message",
+      as.character(div(
+        p(i18n$t("Thank you for your patience\u0021")),
+        div(
+          style = "text-align:right;",
+          modalButton(i18n$t("\u2000Close"), icon = icon("check"))
+        )
+      )),
+      add = TRUE
+    )
+    
+  })
+  
+  # verbatimTextOutput
+  output$project_name_verbatim <- renderText(input$project_name)
+  
+  # list image
+  observeEvent(c(input$path_project_textin, input$project_name, input$goPreprocessing), {
+    updateSelectInput(session, "listimage01", choices = c("Choose a picture" = "", limage()))
+    updateSelectInput(session, "listimage02", choices = c("Choose a picture" = "", limagergb()))
+    updateSelectInput(session, "listimage03", choices = c("Choose a picture" = "", limageind()))
+  })
 
   # if Exit is pressend, exit from GUI
   observeEvent(input$exit_gui, {

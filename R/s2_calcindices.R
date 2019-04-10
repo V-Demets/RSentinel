@@ -109,6 +109,10 @@ s2_calcindices <- function(infiles,
   } else {
     `%DO%` <- `%dopar%`
   }
+  
+  
+  # final outdir from project
+  finaloutdir <- gsub("/indices", paste0("/projets/", project, "/indices"), outdir)
 
   # generate indices.json if missing and read it
   create_indices_db()
@@ -133,7 +137,7 @@ s2_calcindices <- function(infiles,
   indices_info <- indices_db[match(indices, indices_db$name), ]
 
   # check output format
-  gdal_formats <- fromJSON(system.file("extdata", "gdal_formats.json", package = "cnes"))
+  gdal_formats <- fromJSON(system.file("extdata", "gdal_formats.json", package = "shinycnes"))
   if (!is.na(format)) {
     sel_driver <- gdal_formats[gdal_formats$name == format, ]
     if (nrow(sel_driver) == 0) {
@@ -188,8 +192,8 @@ s2_calcindices <- function(infiles,
     # extract parameters
     sel_parameters <- parameters[[indices[i]]]
     for (fic in unlist(sel_infile)) {
-      # replace "indices" by "tiles"
-      fid <- gsub("indices", "tiles", gsub(paste0("_", sel_name, ".tif"), "", fic))
+      # replace "indices" by "/projets/project/tiles"
+      fid <- gsub("indices", paste0("projets/", project, "/tiles"), gsub(paste0("_", sel_name, ".tif"), "", fic))
       # change index formula to be used with bands
       for (sel_par in c("a", "b", "x")) {
         assign(sel_par, if (is.null(sel_parameters[[sel_par]])) {
@@ -223,7 +227,7 @@ s2_calcindices <- function(infiles,
       # path out and format
       sel_format0 <- "GTiff"
       sel_outfile0 <- gsub(paste0(sel_name, ".tif"), paste0(sel_name, "_CALC.tif"), basename(fic))
-      out_subdir0 <- gsub(paste0(project, "/"), "", dirname(fic))
+      out_subdir0 <- gsub(paste0("projets/", project, "/"), "", dirname(fic))
       
       # # Processing to calculate indices
       if (!file.exists(file.path(out_subdir0, sel_outfile0)) && length(str_extract_all(file.path(out_subdir0, sel_outfile0), "\\.tif")) == 1) {
@@ -243,13 +247,14 @@ s2_calcindices <- function(infiles,
     } # end for
   } # end for i
   
-  # We have 3 UTM zones over France. To merge them, we need to resample in common projection. We chose the French standard projection Lambert 93, epsg=2154 
+  # We have 3 UTM over France. To merge them, we need to resample in common 
+  # projection. We chose the French standard projection Lambert 93, epsg=2154 
   for (i in seq_along(infiles)) {
     # indices to process
     sel_infile <- infiles[[i]]["exp"]
     # extract name of indice
     sel_name <- indices_info[i, "name"]
-    out_subdir1 <- gsub(paste0(project, "/"), "", dirname(sel_infile[[1]]))
+    out_subdir1 <- gsub(paste0("projets/", project, "/"), "", dirname(sel_infile[[1]]))
     # verify if any indice *.tif exist
     if (any(!file.exists(unlist(sel_infile)))) {
       cmd <- paste0(
@@ -268,6 +273,10 @@ s2_calcindices <- function(infiles,
           str_extract(basename(unlist(sel_infile)), "T([0-9]{2})[A-Z]")
         )))
       )
+      lw <- paste0(
+        gsub("\\.tif", "_CALC.tif",
+             gsub("\\_T([0-9]{2})[A-Z]", ".*", basename(sel_infile[[1]]))
+        ))
       for (c in seq_along(cmd)) {
         if (!file.exists(gsub(paste0(sel_name, ".tif"), paste0(sel_name, "_CALC_L93.tif"), gsub(paste0(project, "/"), "", unlist(sel_infile)[c])))) {
           system(cmd[c], intern = Sys.info()["sysname"] == "Windows")
@@ -282,21 +291,21 @@ s2_calcindices <- function(infiles,
     sel_infile <- infiles[[i]]["exp"]
     # extract name of indice
     sel_name <- indices_info[i, "name"]
-    out_subdir1 <- gsub(paste0(project, "/"), "", dirname(unlist(sel_infile)[1]))
+    out_subdir1 <- gsub(paste0("projets/", project, "/"), "", dirname(unlist(sel_infile)[1]))
     # list files of indices
-    warped <- list.files(out_subdir1, pattern = paste0("*D_", sel_name, "_CALC_L93.tif"))
+    warped <- list.files(out_subdir1, pattern = paste0(unlist(lw), collapse = "|"))
     if (length(warped) != 0) {
       regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*",
                             str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
       
       # export as a RGB image at full resolution
       for (fic in regx) {
-        if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_CROP.tif"))))) {
-          if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_MERGE.tif"))))) {
+        if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_CROP.tif"))))) {
+          if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_MERGE.tif"))))) {
             cmd <- paste0(
               binpaths$gdal_merge, " -n 0 ",
               file.path(out_subdir1, paste0(fic, paste0("*_", sel_name, "*_CALC_L93.tif -o "))),
-              file.path(outdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_MERGE.tif")))
+              file.path(finaloutdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_MERGE.tif")))
             )
             system(cmd, intern = Sys.info()["sysname"] == "Windows")
           }
@@ -304,8 +313,8 @@ s2_calcindices <- function(infiles,
           cmd <- paste0(
             binpaths$gdalwarp, " -overwrite -dstnodata 0  -te ",
             ext$xmin, " ", ext$ymin, " ", ext$xmax, " ", ext$ymax, " ",
-            file.path(outdir, paste0(gsub("\\*", "", fic),  paste0("_", sel_name, "_CALC_L93_MERGE.tif "))),
-            file.path(outdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_CROP.tif")))
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic),  paste0("_", sel_name, "_CALC_L93_MERGE.tif "))),
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), paste0("_", sel_name, "_CALC_L93_CROP.tif")))
           )
           system(cmd, intern = Sys.info()["sysname"] == "Windows")
         }
@@ -319,15 +328,15 @@ s2_calcindices <- function(infiles,
     sel_infile <- infiles[[i]]["exp"]
     # extract name of indice
     sel_name <- indices_info[i, "name"]
-    out_subdir2 <- dirname(unlist(sel_infile)[1])
+    # out_subdir2 <- dirname(unlist(sel_infile)[1])
     # list files of indices
-    croped <- list.files(out_subdir2, pattern = paste0("*_", sel_name, "_CALC_L93_CROP.tif"), full.names = TRUE)
+    croped <- list.files(finaloutdir, pattern = paste0("*_", sel_name, "_CALC_L93_CROP.tif"), full.names = TRUE)
     if (length(croped) != 0) {
       # export as a RGB image at full resolution
       for (fic in croped) {
-        if (!file.exists(file.path(paste0(out_subdir2, "/jpg"), gsub("\\.tif", ".jpg", basename(fic))))) {
+        if (!file.exists(file.path(paste0(finaloutdir, "/jpg"), gsub("\\.tif", ".jpg", basename(fic))))) {
          raster2rgb(in_rast = fic,
-                    out_file = file.path(paste0(out_subdir2, "/jpg"), gsub("\\.tif", ".jpg", basename(fic))),
+                    out_file = file.path(paste0(finaloutdir, "/jpg"), gsub("\\.tif", ".jpg", basename(fic))),
                     palette = "NDVI"
          )
         }
@@ -336,26 +345,23 @@ s2_calcindices <- function(infiles,
   } # end of i
   
   #### Remove all non CROP files ####
-  out_subdir3 <- dirname(unlist(infiles[[1]]["exp"])[1])
-  fl <- grep(list.files(out_subdir3), pattern = "_CALC_L93_CROP.tif", invert = TRUE, value = TRUE)
+  # out_subdir3 <- dirname(unlist(infiles[[1]]["exp"])[1])
+  fl <- grep(list.files(finaloutdir), pattern = "_CALC_L93_CROP.tif", invert = TRUE, value = TRUE)
   if (length(fl) > 1) {
     print_message(
       type = "message",
       date = TRUE,
       i18n$t("Deletes all temporary files.")
     )
-    file.remove(paste0(out_subdir3, "/", fl[-1]))
+    file.remove(paste0(finaloutdir, "/", fl[-1]))
   }
 
-  
-  
   if (n_cores > 1) {
     print_message(
       type = "message",
       date = TRUE,
       i18n$t("Parallel computation of indices done."))
   }
-
 
   # return(outfiles)
 }

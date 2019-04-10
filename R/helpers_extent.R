@@ -105,7 +105,69 @@ load_extent_vectfile <- function() {
     leafletOutput("view_map_vectfile", height = 400, width = "100%"),
     easyClose = FALSE,
     footer = tagList(
-      actionButton("save_extent_vectfile", strong(i18n$t("\u2000Ok")), icon = icon("check")),
+        actionButton("save_extent_vectfile", strong(i18n$t("\u2000Ok")), icon = icon("check")),
+      modalButton(i18n$t("\u2000Cancel"), icon = icon("ban"))
+    )
+  )
+}
+
+#' @name load_extent_vectfile_pa
+#' @rdname load_extent
+#' @export
+load_extent_vectfile_pa <- function() {
+  modalDialog(
+    title = i18n$t("Select vector file"),
+    size = "m",
+    helpText(em(
+      p(i18n$t("Chose the vector file to be used as extent.")),
+      p(
+        i18n$t("To upload a shapefile, select all the related files"),
+        i18n$t("(at most the .shp, .shx, .dbf and .prj ones must be present).")
+      )
+    )),
+    fileInput("path_vectfile_pa_sel",
+              i18n$t("Select"),
+              multiple = TRUE
+    ),
+    div(
+      style = "display:inline-block;vertical-align:top;",
+      htmlOutput("path_vectfile_pa_errormess")
+    ),
+    leafletOutput("view_map_vectfile_pa", height = 400, width = "100%"),
+    easyClose = FALSE,
+    footer = tagList(
+      actionButton("save_extent_vectfile_pa", strong(i18n$t("\u2000Ok")), icon = icon("check")),
+      modalButton(i18n$t("\u2000Cancel"), icon = icon("ban"))
+    )
+  )
+}
+
+#' @name load_extent_vectfile_mask
+#' @rdname load_extent
+#' @export
+load_extent_vectfile_mask <- function() {
+  modalDialog(
+    title = i18n$t("Select vector file"),
+    size = "m",
+    helpText(em(
+      p(i18n$t("Chose the vector file to be used as extent.")),
+      p(
+        i18n$t("To upload a shapefile, select all the related files"),
+        i18n$t("(at most the .shp, .shx, .dbf and .prj ones must be present).")
+      )
+    )),
+    fileInput("path_vectfile_mask_sel",
+              i18n$t("Select"),
+              multiple = TRUE
+    ),
+    div(
+      style = "display:inline-block;vertical-align:top;",
+      htmlOutput("path_vectfile_mask_errormess")
+    ),
+    leafletOutput("view_map_vectfile_mask", height = 400, width = "100%"),
+    easyClose = FALSE,
+    footer = tagList(
+      actionButton("save_extent_vectfile_mask", strong(i18n$t("\u2000Ok")), icon = icon("check")),
       modalButton(i18n$t("\u2000Cancel"), icon = icon("ban"))
     )
   )

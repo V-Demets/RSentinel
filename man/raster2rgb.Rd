@@ -19,14 +19,6 @@ or character value of a builtin palette (the default
 
 \item{tmpdir}{(optional) Path where intermediate files (VRT) will be created.
 Default is a temporary directory.}
-
-\item{minval}{(to be implemented) the value corresponding to the minimum
-value of the palette (for now, only -1 is used). A quantile will be also
-accepted.}
-
-\item{maxval}{(to be implemented) the value corresponding to the maximum
-value of the palette (for now, only 1 is used). A quantile will be also
-accepted.}
 }
 \value{
 The path of the output image; alternatively, the output image

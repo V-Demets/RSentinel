@@ -125,7 +125,7 @@ trace_function <- function(trace_fun, trace_files, trace_funname = NA, ...) {
 clean_traces <- function(trace_funname = NA) {
 
   # import the content of the path in which trace txt files are placed
-  trace_path <- system.file("logs", package = "cnes")
+  trace_path <- system.file("logs", package = "shinycnes")
   tracenames_df <- data.frame(name = list.files(trace_path, "^([0-9]+)\\_(.*)\\.txt$", full.names = TRUE), stringsAsFactors = FALSE)
   tracenames_df$time <- gsub("^([0-9]+)\\_(.*)\\.txt$", "\\1", basename(tracenames_df$name)) %>% as.POSIXct(format = "%y%m%d%H%M%S")
   tracenames_df$fun <- gsub("^([0-9]+)\\_(.*)\\.txt$", "\\2", basename(tracenames_df$name))

@@ -3,6 +3,8 @@
 \name{load_extent_bbox}
 \alias{load_extent_bbox}
 \alias{load_extent_vectfile}
+\alias{load_extent_vectfile_pa}
+\alias{load_extent_vectfile_mask}
 \alias{load_extent_draw}
 \alias{load_extent_forest}
 \title{Insert an extent}
@@ -10,6 +12,10 @@
 load_extent_bbox()
 
 load_extent_vectfile()
+
+load_extent_vectfile_pa()
+
+load_extent_vectfile_mask()
 
 load_extent_draw(extent_ns_name)
 

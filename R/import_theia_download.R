@@ -24,7 +24,7 @@ import_theia_download <- function(with_aria2 = TRUE, ...) {
   dependencies <- c(mandeps, optdeps)
 
   # define theia_download path
-  theia_download_path <- system.file("theia_download", package = "cnes")
+  theia_download_path <- system.file("theia_download", package = "shinycnes")
 
   # check that git, python2 and wget are installed
   binpaths <- load_binpaths(dependencies)

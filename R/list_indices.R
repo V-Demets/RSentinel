@@ -33,7 +33,7 @@ list_indices <- function(values, pattern = "") {
   create_indices_db()
 
   # read indices database
-  json_path <- system.file("extdata", "indices.json", package = "cnes")
+  json_path <- system.file("extdata", "indices.json", package = "shinycnes")
   indices <- jsonlite::fromJSON(json_path)
 
   # select requested values from the table

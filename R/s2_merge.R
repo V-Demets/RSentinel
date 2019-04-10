@@ -63,6 +63,7 @@
 s2_merge <- function(infiles,
                      tilesdir,
                      warpedir,
+                     extent,
                      outdir = ".",
                      subdirs = NA,
                      tmpdir = NA,
@@ -81,25 +82,47 @@ s2_merge <- function(infiles,
   # Load GDAL paths
   binpaths <- load_binpaths("gdal")
   
+  # Extent + buffer(500m)
+  ext <- extent %>% st_transform(2154) %>% st_buffer(500) %>% st_bbox()
+
   msg <- NULL
 
   warped <- list.files(warpedir, pattern = "tif")
   regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*", str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
 
-  # export as a RGB image at full resolution
+  # export and crop as a RGB image at full resolution
   for (fic in regx) {
     for (BAND in def_names$sentinel2) {
-      if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_L93_", BAND, ".tif")))) {
+      if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_L93_MERGED_CROP_", BAND, ".tif")))) {
         cmd <- paste(
           paste0(
             binpaths$gdal_merge, " -n 0 ",
             file.path(warpedir, paste0(fic, "*_", BAND, "*.tif", " -o ")),
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_L93_", BAND, ".tif"))
+            file.path(outdir, paste0(gsub("\\*", "", fic), "_L93_MERGED_", BAND, ".tif"))
           )
+        )
+        msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
+        # crop it to the extent
+        cmd <- paste0(
+          binpaths$gdalwarp, " -overwrite -dstnodata 0  -te ",
+          ext$xmin, " ", ext$ymin, " ", ext$xmax, " ", ext$ymax, " ",
+          file.path(outdir, paste0(gsub("\\*", "", fic), "_L93_MERGED_", BAND, ".tif ")),
+          file.path(outdir, paste0(gsub("\\*", "", fic), "_L93_MERGED_CROP_", BAND, ".tif"))
         )
         msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
       }
     }
+  }
+  
+  #### Remove all non CROP files ####
+  fl <- grep(list.files(outdir), pattern = "CROP", invert = TRUE, value = TRUE)
+  if (length(fl) >= 1) {
+    print_message(
+      type = "message",
+      date = TRUE,
+      i18n$t("Deletes all temporary files.")
+    )
+    file.remove(paste0(outdir, "/", fl))
   }
 
   return(msg)

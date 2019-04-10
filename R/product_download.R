@@ -70,7 +70,7 @@ product_download <- function(spatial_extent = NULL, tile = NULL, orbit = NULL, #
       )
     } else {
       # extract and import tiles kml
-      s2tiles_kmz <- system.file("extdata", "vector", "s2_tiles.kmz", package = "cnes")
+      s2tiles_kmz <- system.file("extdata", "vector", "s2_tiles.kmz", package = "shinycnes")
       s2tiles_kml <- gsub("\\.kmz$", ".kml", s2tiles_kmz)
       if (!file.exists(s2tiles_kml)) {
         unzip(
@@ -139,7 +139,7 @@ product_download <- function(spatial_extent = NULL, tile = NULL, orbit = NULL, #
   }
 
   # define theia_download path
-  theia_download_path <- system.file("theia_download", package = "cnes")
+  theia_download_path <- system.file("theia_download", package = "shinycnes")
 
   # link to api
   if (is.null(api)) {

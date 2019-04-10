@@ -37,9 +37,9 @@ create_indices_db <- function(xslt_path = NA,
   # check if indices.json already exists, and if the version is updated
   # we assume that a new version of indices.json is created at every new ackage update
   if (is.na(json_path)) {
-    json_path <- file.path(system.file("extdata", package = "cnes"), "indices.json")
+    json_path <- file.path(system.file("extdata", package = "shinycnes"), "indices.json")
   }
-  if (system.file("extdata", "indices.json", package = "cnes") == json_path) {
+  if (system.file("extdata", "indices.json", package = "shinycnes") == json_path) {
     if (force == FALSE) {
       return(invisible(NULL))
     }
@@ -56,7 +56,7 @@ create_indices_db <- function(xslt_path = NA,
 
   # set XSLT path
   if (is.na(xslt_path)) {
-    xslt_path <- file.path(system.file(package = "cnes"), "extdata", "xslt")
+    xslt_path <- file.path(system.file(package = "shinycnes"), "extdata", "xslt")
   }
 
   # if missing, download xsltml to convert from MathML to LaTeX: http://fhoerni.free.fr/comp/xslt.html

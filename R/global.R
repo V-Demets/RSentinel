@@ -3,7 +3,8 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
   shiny, shinythemes, shinydashboard, shinyjs, shinyWidgets, leaflet, ggvis, ggrepel, dplyr, RColorBrewer, raster, gstat,
   rgdal, ggmap, ggplot2, reticulate, tools, leaflet.extras, pool, RPostgreSQL, devtools, mapedit, shiny.i18n, Cairo,
-  stringr, shinyFiles, data.table, jsonlite, geojsonio, geojsonlint, imager, DBI
+  stringr, shinyFiles, data.table, jsonlite, geojsonio, geojsonlint, imager, DBI, SDMSelect, sdm, randomForest, snow, 
+  caret, purrr, tibble, magrittr
 )
 pacman::p_load_gh("hadley/tidyverse", "tidyverse/ggplot2", "tidyverse/dplyr", "r-spatial/sf", "jrowen/rhandsontable")
 
@@ -12,7 +13,7 @@ options(shiny.maxRequestSize = mega * 1024^2)
 options(encoding = "UTF-8")
 
 # i18n
-i18n <- shiny.i18n::Translator$new(translation_json_path = system.file("translations/translation.json", package = "shiny-cnes"))
+i18n <- shiny.i18n::Translator$new(translation_json_path = system.file("translations/translation.json", package = "shinycnes"))
 i18n$set_translation_language("fr")
 
 

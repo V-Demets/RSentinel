@@ -4,9 +4,10 @@
 \alias{s2_merge}
 \title{Merge S2 tiles with the same date and orbit}
 \usage{
-s2_merge(infiles, tilesdir, warpedir, outdir = ".", subdirs = NA,
-  tmpdir = NA, rmtmp = TRUE, format = NA, compress = "DEFLATE",
-  vrt_rel_paths = NA, resolution = 10, overwrite = FALSE)
+s2_merge(infiles, tilesdir, warpedir, extent, outdir = ".",
+  subdirs = NA, tmpdir = NA, rmtmp = TRUE, format = NA,
+  compress = "DEFLATE", vrt_rel_paths = NA, resolution = 10,
+  overwrite = FALSE)
 }
 \arguments{
 \item{infiles}{A vector of input filenames. Input files are paths

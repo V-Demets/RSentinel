@@ -23,7 +23,7 @@
 load_binpaths <- function(bins = NULL) {
 
   # Define where the JSON with the paths is
-  binpaths_file <- file.path(system.file("extdata", package = "cnes"), "paths.json")
+  binpaths_file <- file.path(system.file("extdata", package = "shinycnes"), "paths.json")
 
   # If it exists, load it; otherwise, create empty
   binpaths <- if (file.exists(binpaths_file)) {

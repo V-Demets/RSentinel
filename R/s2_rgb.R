@@ -55,6 +55,7 @@ s2_rgb <- function(infiles,
                    tilesdir,
                    extent,
                    mosaicdir,
+                   project,
                    outdir = ".",
                    subdirs = NA,
                    tmpdir = NA,
@@ -78,15 +79,18 @@ s2_rgb <- function(infiles,
 
   # calc cpu
   cpu <- parallel::detectCores()
+  
+  # final outdir from project
+  finaloutdir <- gsub("/rgb", paste0("/projets/", project, "/rgb"), outdir)
 
   # temp var
-  war <- list.files(outdir, pattern = "CROP")
+  war <- list.files(finaloutdir, pattern = "CROP")
   reg <- unique(paste0(
     str_extract(basename(war), "SENTINEL2A\\_([0-9]{8})"), "_L2A",
     str_extract(basename(war), "\\_T([0-9]{2})[A-Z]"),
     str_extract(basename(war), "_RGB_L93_CROP_[a-z].*.tif")
   ))
-  regx1 <- paste0(outdir, reg)
+  regx1 <- paste0(finaloutdir, reg)
 
   #### list UTM in paths ####
   for (fic in infiles) {
@@ -372,21 +376,21 @@ s2_rgb <- function(infiles,
 
       # export as a RGB image at full resolution
       for (fic in regx) {
-        if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_natural.tif")))) {
-          if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_natural.tif")))) {
+        if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_natural.tif")))) {
+          if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_natural.tif")))) {
             cmd <- paste0(
               binpaths$gdal_merge, " -n 0 ",
               file.path(outdir, paste0(fic, "*RGB_L93_natural.tif -o ")),
-              file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_natural.tif"))
+              file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_natural.tif"))
             )
             msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
           }
-          # cut it
+          # crop it to the extent
           cmd <- paste0(
             binpaths$gdalwarp, " -overwrite -dstnodata 0  -te ",
             ext$xmin, " ", ext$ymin, " ", ext$xmax, " ", ext$ymax, " ",
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_natural.tif ")),
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_natural.tif"))
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_natural.tif ")),
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_natural.tif"))
           )
           msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
         }
@@ -401,21 +405,21 @@ s2_rgb <- function(infiles,
 
       # export as a RGB image at full resolution
       for (fic in regx) {
-        if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_nearinfra.tif")))) {
-          if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_nearinfra.tif")))) {
+        if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_nearinfra.tif")))) {
+          if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_nearinfra.tif")))) {
             cmd <- paste0(
               binpaths$gdal_merge, " -n 0 ",
               file.path(outdir, paste0(fic, "*RGB_L93_nearinfra.tif -o ")),
-              file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_nearinfra.tif"))
+              file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_nearinfra.tif"))
             )
             msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
           }
-          # cut it
+          # crop it to the extent
           cmd <- paste0(
             binpaths$gdalwarp, " -overwrite -dstnodata 0  -te ",
             ext$xmin, " ", ext$ymin, " ", ext$xmax, " ", ext$ymax, " ",
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_nearinfra.tif ")),
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_nearinfra.tif"))
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_nearinfra.tif ")),
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_nearinfra.tif"))
           )
           msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
         }
@@ -430,21 +434,21 @@ s2_rgb <- function(infiles,
 
       # export as a RGB image at full resolution
       for (fic in regx) {
-        if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_farinfra.tif")))) {
-          if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_farinfra.tif")))) {
+        if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_farinfra.tif")))) {
+          if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_farinfra.tif")))) {
             cmd <- paste0(
               binpaths$gdal_merge, " -n 0 ",
               file.path(outdir, paste0(fic, "*RGB_L93_farinfra.tif -o ")),
-              file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_farinfra.tif"))
+              file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_farinfra.tif"))
             )
             msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
           }
-          # cut it
+          # crop it to the extent
           cmd <- paste0(
             binpaths$gdalwarp, " -overwrite -dstnodata 0  -te ",
             ext$xmin, " ", ext$ymin, " ", ext$xmax, " ", ext$ymax, " ",
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_farinfra.tif ")),
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_farinfra.tif"))
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_farinfra.tif ")),
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_farinfra.tif"))
           )
           msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
         }
@@ -457,14 +461,14 @@ s2_rgb <- function(infiles,
       regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*",
                             str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
 
-      # export as a RGB image at full resolution
+      # export as a RGB image at full resolution in finaloutdir
       for (fic in regx) {
-        if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_vegetation.tif")))) {
-          if (!file.exists(file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_vegetation.tif")))) {
+        if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_vegetation.tif")))) {
+          if (!file.exists(file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_vegetation.tif")))) {
             cmd <- paste0(
               binpaths$gdal_merge, " -n 0 ",
               file.path(outdir, paste0(fic, "*RGB_L93_vegetation.tif -o ")),
-              file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_vegetation.tif"))
+              file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_vegetation.tif"))
             )
             msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
           }
@@ -472,8 +476,8 @@ s2_rgb <- function(infiles,
           cmd <- paste0(
             binpaths$gdalwarp, " -overwrite -dstnodata 0  -te ",
             ext$xmin, " ", ext$ymin, " ", ext$xmax, " ", ext$ymax, " ",
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_vegetation.tif ")),
-            file.path(outdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_vegetation.tif"))
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_MERGED_vegetation.tif ")),
+            file.path(finaloutdir, paste0(gsub("\\*", "", fic), "_RGB_L93_CROP_vegetation.tif"))
           )
           msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
         }
@@ -482,19 +486,19 @@ s2_rgb <- function(infiles,
   }
 
   #### Remove all non CROP files ####
-  fl <- grep(list.files(outdir), pattern = "CROP", invert = TRUE, value = TRUE)
+  fl <- grep(list.files(finaloutdir), pattern = "CROP", invert = TRUE, value = TRUE)
   if (length(fl) > 1) {
     print_message(
       type = "message",
       date = TRUE,
       i18n$t("Deletes all temporary files.")
     )
-    file.remove(paste0(outdir, "/", fl[[-1]]))
+    file.remove(paste0(finaloutdir, "/", fl[-1]))
   }
 
   #### export all .tif in .jpg ####
-  fc <- grep(list.files(outdir), pattern = "CROP", value = TRUE)
-  fj <- grep(list.files(paste0(outdir, "/jpg")), pattern = ".jpg.aux", value = TRUE)
+  fc <- grep(list.files(finaloutdir), pattern = "CROP", value = TRUE)
+  fj <- grep(list.files(paste0(finaloutdir, "/jpg")), pattern = ".jpg.aux", value = TRUE)
   if (length(fj) != length(fc)) {
     print_message(
       type = "message",
@@ -504,13 +508,13 @@ s2_rgb <- function(infiles,
     for (fic in fc) {
       cmd <- paste0(
         binpaths$gdal_translate, " -q -of JPEG -co QUALITY=90 -a_nodata 0 ",
-        file.path(paste0(outdir, "/", fic)), " ",
-        file.path(paste0(outdir, "/jpg"), paste0(gsub("\\.tif", ".jpg", basename(fic))))
+        file.path(paste0(finaloutdir, "/", fic)), " ",
+        file.path(paste0(finaloutdir, "/jpg"), paste0(gsub("\\.tif", ".jpg", basename(fic))))
       )
       msg <- system(cmd, intern = Sys.info()["sysname"] == "Windows")
     }
   }
-  
+
   return(msg)
   
 }

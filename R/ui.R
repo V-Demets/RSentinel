@@ -66,8 +66,17 @@ cnes_gui.ui <- dashboardPage(
       p(
         style = "margin-top:0pt;",
         actionButton(
-          "goButton",
-          label = i18n$t("\u2000Press to launch calc"),
+          "goPreprocessing",
+          label = i18n$t("\u2000Starts preprocessing"),
+          icon = icon("cog", class = "fa-spin"),
+          class = "darkbutton"
+        )
+      ),
+      p(
+        style = "margin-top:0pt;",
+        actionButton(
+          "goPrediction",
+          label = i18n$t("\u2000Starts prediction"),
           icon = icon("cog", class = "fa-spin"),
           class = "darkbutton"
         )
@@ -1079,11 +1088,40 @@ cnes_gui.ui <- dashboardPage(
         br(),
         fluidRow(
           box(
-            title = i18n$t("Tiles presence/absence"),
+            title = i18n$t("Presence/Absence"),
             status = "primary",
             solidHeader = TRUE,
             collapsible = TRUE,
             width = 4,
+            # button
+            column(
+              width = 12,
+              # Buttons to load the extent with modal dialogs
+              strong(i18n$t("Specify the extent:\u2000")),
+              span(
+                div(
+                  style = "padding-top:5px;padding-bottom:10px;",
+                  actionButton(
+                    "button_extent_vectfile_pa",
+                    label = i18n$t("\u2000Load a vector file"),
+                    width = 176,
+                    icon = icon("upload")
+                  ),
+                  # actionButton(
+                  #   "button_extent_draw_pa",
+                  #   label = i18n$t("\u2000Draw it on the map"),
+                  #   width = 176,
+                  #   icon = icon("paint-brush")
+                  # ),
+                  actionButton(
+                    "button_refresh_map_pa",
+                    label = i18n$t("\u2000Reload the extent on map"),
+                    width = 176,
+                    icon = icon("retweet")
+                  )
+                ) # end of div
+              ) # end of span
+            ), # end of column
             # Map presence/absence
             leafletOutput("view_map_presabs", height = 500, width = "100%")
           ), # end box
@@ -1100,13 +1138,42 @@ cnes_gui.ui <- dashboardPage(
             ) # end div
           ), # end box
           box(
-            title = i18n$t("Tiles shapefile"),
+            title = i18n$t("Mask shapefile"),
             status = "primary",
             solidHeader = TRUE,
             collapsible = TRUE,
             width = 4,
+            # button
+            column(
+              width = 12,
+              # Buttons to load the extent with modal dialogs
+              strong(i18n$t("Specify the extent:\u2000")),
+              span(
+                div(
+                  style = "padding-top:5px;padding-bottom:10px;",
+                  actionButton(
+                    "button_extent_vectfile_mask",
+                    label = i18n$t("\u2000Load a vector file"),
+                    width = 176,
+                    icon = icon("upload")
+                  ),
+                  # actionButton(
+                  #   "button_extent_draw_mask",
+                  #   label = i18n$t("\u2000Draw it on the map"),
+                  #   width = 176,
+                  #   icon = icon("paint-brush")
+                  # ),
+                  actionButton(
+                    "button_refresh_map_mask",
+                    label = i18n$t("\u2000Reload the extent on map"),
+                    width = 176,
+                    icon = icon("retweet")
+                  )
+                ) # end of div
+              ) # end of span
+            ), # end of column
             # Map presence/absence
-            leafletOutput("view_map_shapefile", height = 500, width = "100%")
+            leafletOutput("view_map_mask", height = 500, width = "100%")
           ) # end box
         ), # end fluidrow 2
         br(),
@@ -1127,6 +1194,40 @@ cnes_gui.ui <- dashboardPage(
             solidHeader = TRUE,
             collapsible = TRUE,
             width = 12,
+            # proejct name and button
+            column(
+              width = 8,
+              # Buttons to load the extent with modal dialogs
+              span(
+                div(
+                  style = "display:inline-block;vertical-align:top;",
+                  strong(i18n$t("Name of project: \u00a0"))
+                ),
+                div(
+                  style = "display:inline-block;vertical-align:top;width:calc(100% - 50pt - 3px);",
+                  verbatimTextOutput("project_name_verbatim")
+                )
+              ) # end of span
+            ), # end of column
+            column(
+              width = 4,
+              # Buttons to load the extent with modal dialogs
+              span(
+                div(
+                  style = "display:inline-block;vertical-align:top;",
+                  strong(i18n$t("Click on button: \u00a0"))
+                ),
+                div(
+                  style = "padding-top:5px;padding-bottom:10px;",
+                  actionButton(
+                    "button_refresh_map_prevision",
+                    label = i18n$t("\u2000Reload the extent on map"),
+                    width = 176,
+                    icon = icon("retweet")
+                  )
+                ) # end of div
+              ) # end of span
+            ), # end of column
             # Map
             leafletOutput("view_map_prevision", height = 800, width = "100%")
           ) # end of box

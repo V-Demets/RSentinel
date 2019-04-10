@@ -188,19 +188,19 @@
 #' @importFrom tools file_path_sans_ext
 #' @export
 #'
-cnes <- function(param_list = NULL) {
-  .cnes(
+preprocessing <- function(param_list = NULL) {
+  .preprocessing(
     param_list = param_list,
     par_fun = "parent"
   )
 }
 
-# Internal function, which is the "real" cnes() function insider the use of sink
+# Internal function, which is the "real" preprocessing() function insider the use of sink
 # (this workaround was used in order to manage final sink() in those cases
 # in which return() is used inside the function.)
-# TODO: manage also errors (.cnes inside a trycatch; in case of errors, stop
+# TODO: manage also errors (.preprocessing inside a trycatch; in case of errors, stop
 # passing the error message)
-.cnes <- function(param_list = NULL,
+.preprocessing <- function(param_list = NULL,
                   parallel = TRUE,
                   use_python = TRUE,
                   tmpdir = NA,
@@ -224,7 +224,7 @@ cnes <- function(param_list = NULL) {
     param_list
     # TODO check parameter names
   } else {
-    list("pkg_version" = packageVersion("cnes"))
+    list("pkg_version" = packageVersion("shinycnes"))
   }
 
   ## Check consistency of parameters
@@ -282,7 +282,7 @@ cnes <- function(param_list = NULL) {
       dir.create(main_dir, showWarnings = FALSE)
       file.path(main_dir, ".vrt")
     } else {
-      tempfile(pattern = "cnes_")
+      tempfile(pattern = "shinycnes_")
     }
   }
   if (pm$outformat == "VRT") {
@@ -424,7 +424,7 @@ cnes <- function(param_list = NULL) {
 
   # check output format
   gdal_formats <-
-    fromJSON(system.file("extdata", "gdal_formats.json", package = "cnes"))
+    fromJSON(system.file("extdata", "gdal_formats.json", package = "shinycnes"))
   sel_driver <- gdal_formats[gdal_formats$name == pm$outformat, ]
   if (is.null(pm$rgb_outformat)) {
     pm$rgb_outformat <- pm$outformat
@@ -769,11 +769,7 @@ cnes <- function(param_list = NULL) {
     )
 
     # unzip files
-    zipfile <-
-      list.files(
-        path = pm$path_data,
-        pattern = "zip"
-      )
+    zipfile <- c(paste0(cnes_list, ".zip"))
     for (l in zipfile) {
       if (!dir.exists(paste0(pm$path_data, "/", file_path_sans_ext(l)))) {
         print_message(
@@ -788,7 +784,7 @@ cnes <- function(param_list = NULL) {
           overwrite = FALSE
         )
       }
-    }
+    } # end of for
 
     # copy cnes2names$tiles_names_exp in project/tiles
     # find the files that i want
@@ -821,222 +817,212 @@ cnes <- function(param_list = NULL) {
 
   ### GDAL processing: convert THEIA, merge tiles, warp, mask and compute indices ###
 
-  # ##### 5. Mosaic by orbit #####
-  # cnes_lists_mosaic <- list()
-  # if (sum(!file.exists(nn(cnes2names$mosaic_names_new))) > 0) {
-  #   print_message(
-  #     type = "message",
-  #     date = TRUE,
-  #     i18n$t("Starting to mosaic tiles by date and orbit.")
-  #   )
-  # 
-  #   dir.create(paths["mosaic"], recursive = FALSE, showWarnings = FALSE)
-  # 
-  #   cnes_lists_mosaic[["cnes"]] <- s2_mosaic(
-  #     infiles = cnes2names$mosaic_names_new,
-  #     cnes_list = cnes_list,
-  #     tilesdir = paths["tiles"],
-  #     outdir = paths["mosaic"],
-  #     parallel = TRUE
-  #   )
-  # }
-  # 
-  # ##### 6. Translate by orbit #####
-  # cnes_lists_translate <- list()
-  # 
-  # if (sum(!file.exists(nn(cnes2names$translate_names_new))) > 0) {
-  #   print_message(
-  #     type = "message",
-  #     date = TRUE,
-  #     i18n$t("Starting to translate tiles, export as TIF full resolution.")
-  #   )
-  # 
-  #   dir.create(paths["translate"], recursive = FALSE, showWarnings = FALSE)
-  # 
-  #   cnes_lists_translate[["cnes"]] <- s2_translate(
-  #     infiles = cnes2names$translate_names_new,
-  #     tilesdir = paths["tiles"],
-  #     mosaicdir = paths["mosaic"],
-  #     outdir = paths["translate"]
-  #   )
-  # }
-  # 
-  # ##### 7. Warpe #####
-  # cnes_lists_warped <- list()
-  # if (sum(!file.exists(nn(cnes2names$warped_names_new))) > 0) {
-  #   ## Rescale, reproject ##
-  #   if (pm$clip_on_extent == TRUE) {
+  ##### 5. Mosaic by orbit #####
+  cnes_lists_mosaic <- list()
+  if (sum(!file.exists(nn(cnes2names$mosaic_names_new))) > 0) {
+    print_message(
+      type = "message",
+      date = TRUE,
+      i18n$t("Starting to mosaic tiles by date and orbit.")
+    )
+
+    dir.create(paths["mosaic"], recursive = FALSE, showWarnings = FALSE)
+
+    cnes_lists_mosaic[["cnes"]] <- s2_mosaic(
+      infiles = cnes2names$mosaic_names_new,
+      cnes_list = cnes_list,
+      tilesdir = paths["tiles"],
+      outdir = paths["mosaic"],
+      parallel = TRUE
+    )
+  }
+
+  ##### 6. Translate by orbit #####
+  cnes_lists_translate <- list()
+
+  if (sum(!file.exists(nn(cnes2names$translate_names_new))) > 0) {
+    print_message(
+      type = "message",
+      date = TRUE,
+      i18n$t("Starting to translate tiles, export as TIF full resolution.")
+    )
+
+    dir.create(paths["translate"], recursive = FALSE, showWarnings = FALSE)
+
+    cnes_lists_translate[["cnes"]] <- s2_translate(
+      infiles = cnes2names$translate_names_new,
+      tilesdir = paths["tiles"],
+      mosaicdir = paths["mosaic"],
+      outdir = paths["translate"]
+    )
+  }
+
+  ##### 7. Warpe #####
+  cnes_lists_warped <- list()
+  if (sum(!file.exists(nn(cnes2names$warped_names_new))) > 0) {
+    ## Rescale, reproject ##
+    if (pm$clip_on_extent == TRUE) {
+      print_message(
+        type = "message",
+        date = TRUE,
+        i18n$t("Starting to edit geometry (reproject, rescale).")
+      )
+
+      dir.create(paths["warped"], recursive = FALSE, showWarnings = FALSE)
+
+      cnes_lists_warped[["cnes"]] <- s2_warped(
+        infiles = cnes2names$warped_names_new,
+        tilesdir = paths["tiles"],
+        translatedir = paths["translate"],
+        outdir = paths["warped"]
+      )
+    }
+  }
+
+
+  ##### 8. Merge #####
+  cnes_lists_merged <- list()
+  if (sum(!file.exists(nn(cnes2names$merged_names_new))) > 0) {
+    ## Merge ##
+    print_message(
+      type = "message",
+      date = TRUE,
+      i18n$t("Starting to edit geometry (merge).")
+    )
+
+    dir.create(paths["merged"], recursive = FALSE, showWarnings = FALSE)
+
+    cnes_lists_merged[["cnes"]] <- s2_merge(
+      infiles = cnes2names$merged_names_new,
+      extent = pm$extent,
+      tilesdir = paths["tiles"],
+      warpedir = paths["warped"],
+      outdir = paths["merged"]
+    )
+  }
+
+  #   ###### 9. Apply mask #####"
+  #   # FIXME understand if this should be done before warping (if so, how to manage virtual/physical files?)
+  #   # masked_names <- file.path(paths["out"],
+  #   #                           if(pm$path_subdirs==TRUE){basename(dirname(warped_names[!names_merged_exp_scl_idx]))}else{""},
+  #   #                           gsub(paste0(warped_ext,"$"),out_ext,basename(warped_names[!names_merged_exp_scl_idx])))
+  #
+  #   if (!is.na(pm$mask_type) & length(s2names$masked_names_new) > 0) {
   #     print_message(
   #       type = "message",
   #       date = TRUE,
-  #       i18n$t("Starting to edit geometry (reproject, rescale).")
+  #       "Starting to apply cloud masks."
   #     )
-  # 
-  #     dir.create(paths["warped"], recursive = FALSE, showWarnings = FALSE)
-  # 
-  #     # create mask
-  #     s2_mask_extent <- if (is(pm$extent, "vector") && is.na(pm$extent)) {
-  #       NULL
-  #     } else if (anyNA(pm$extent$geometry)) { # FIXME check on telemod tiffs
-  #       NULL
-  #     } else if (pm$extent_as_mask == TRUE) {
-  #       pm$extent %>% st_combine() # TODO remove this when multiple extents will be allowed
+  #
+  #     # index which is TRUE for SCL products, FALSE for others
+  #     names_warped_exp_scl_idx <- theia2r_getElements(s2names$warped_names_exp, format = "data.frame")$prod_type == "SCL"
+  #     names_warped_req_scl_idx <- theia2r_getElements(s2names$warped_names_req, format = "data.frame")$prod_type == "SCL"
+  #     # index which is TRUE for products to be atm. masked, FALSE for others
+  #     names_warped_tomask_idx <- if ("SCL" %in% pm$list_prods) {
+  #       names_warped_req_scl_idx > -1
   #     } else {
-  #       suppressWarnings(st_cast(st_cast(pm$extent, "POLYGON"), "LINESTRING")) %>%
-  #         st_combine() # TODO remove this when multiple extents will be allowed
-  #     } # TODO add support for multiple extents
-  # 
-  #     cnes_lists_warped[["cnes"]] <- s2_warped(
-  #       infiles = cnes2names$warped_names_new,
-  #       tilesdir = paths["tiles"],
-  #       translatedir = paths["translate"],
-  #       outdir = paths["warped"]
+  #       !names_warped_req_scl_idx
+  #     }
+  #
+  #     # if SR outformat is different (because BOA was not required,
+  #     # bur some indices are) launch s2_mask separately
+  #     masked_names_infiles <- if (pm$clip_on_extent == TRUE) {
+  #       s2names$warped_names_req[names_warped_tomask_idx & file.exists(s2names$warped_names_req)]
+  #     } else {
+  #       s2names$merged_names_req[names_merged_tomask_idx & file.exists(s2names$merged_names_req)]
+  #     }
+  #     masked_names_infiles_sr_idx <- any(!is.na(pm$list_indices)) &
+  #       !pm$index_source %in% pm$list_prods &
+  #       sapply(masked_names_infiles, function(x) {
+  #         theia2r_getElements(x)$prod_type == pm$index_source
+  #       })
+  #
+  #     masked_names_out_nsr <- if (length(masked_names_infiles[!masked_names_infiles_sr_idx]) > 0) {
+  #       trace_function(
+  #         s2_mask,
+  #         infiles = masked_names_infiles[!masked_names_infiles_sr_idx],
+  #         maskfiles = if (pm$clip_on_extent == TRUE) {
+  #           s2names$warped_names_exp[names_warped_exp_scl_idx]
+  #         } else {
+  #           s2names$merged_names_exp[names_merged_exp_scl_idx]
+  #         },
+  #         smooth = pm$mask_smooth,
+  #         buffer = pm$mask_buffer,
+  #         mask_type = pm$mask_type,
+  #         max_mask = pm$max_mask,
+  #         outdir = paths["out"],
+  #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
+  #         format = out_outformat,
+  #         compress = pm$compression,
+  #         subdirs = pm$path_subdirs,
+  #         overwrite = pm$overwrite,
+  #         parallel = pm$parallel,
+  #         .log_message = .log_message, .log_output = .log_output,
+  #         trace_files = s2names$out_names_new
+  #       )
+  #     } else {
+  #       character(0)
+  #     }
+  #     masked_names_out_sr <- if (length(masked_names_infiles[masked_names_infiles_sr_idx]) > 0) {
+  #       trace_function(
+  #         s2_mask,
+  #         infiles = masked_names_infiles[masked_names_infiles_sr_idx],
+  #         maskfiles = if (pm$clip_on_extent == TRUE) {
+  #           s2names$warped_names_exp[names_warped_exp_scl_idx]
+  #         } else {
+  #           s2names$merged_names_exp[names_merged_exp_scl_idx]
+  #         },
+  #         mask_type = pm$mask_type,
+  #         smooth = pm$mask_smooth,
+  #         buffer = pm$mask_buffer,
+  #         max_mask = pm$max_mask,
+  #         outdir = paths["out"],
+  #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
+  #         format = sr_masked_outformat,
+  #         compress = pm$compression,
+  #         subdirs = pm$path_subdirs,
+  #         overwrite = pm$overwrite,
+  #         parallel = pm$parallel,
+  #         .log_message = .log_message, .log_output = .log_output,
+  #         trace_files = s2names$out_names_new
+  #       )
+  #     } else {
+  #       character(0)
+  #     }
+  #     masked_names_out <- c(masked_names_out_nsr, masked_names_out_sr)
+  #     masked_names_notcreated <- c(
+  #       attr(masked_names_out_nsr, "toomasked"),
+  #       attr(masked_names_out_sr, "toomasked")
   #     )
   #   }
-  # }
-  # 
-  # 
-  # ##### 8. Merge #####
-  # cnes_lists_merged <- list()
-  # if (sum(!file.exists(nn(cnes2names$merged_names_new))) > 0) {
-  #   ## Merge ##
-  #   print_message(
-  #     type = "message",
-  #     date = TRUE,
-  #     i18n$t("Starting to edit geometry (merge).")
-  #   )
-  # 
-  #   dir.create(paths["merged"], recursive = FALSE, showWarnings = FALSE)
-  # 
-  #   cnes_lists_merged[["cnes"]] <- s2_merge(
-  #     infiles = cnes2names$merged_names_new,
-  #     tilesdir = paths["tiles"],
-  #     warpedir = paths["warped"],
-  #     outdir = paths["merged"]
-  #   )
-  # }
-  # 
-  # #   ###### 9. Apply mask #####"
-  # #   # FIXME understand if this should be done before warping (if so, how to manage virtual/physical files?)
-  # #   # masked_names <- file.path(paths["out"],
-  # #   #                           if(pm$path_subdirs==TRUE){basename(dirname(warped_names[!names_merged_exp_scl_idx]))}else{""},
-  # #   #                           gsub(paste0(warped_ext,"$"),out_ext,basename(warped_names[!names_merged_exp_scl_idx])))
-  # #
-  # #   if (!is.na(pm$mask_type) & length(s2names$masked_names_new) > 0) {
-  # #     print_message(
-  # #       type = "message",
-  # #       date = TRUE,
-  # #       "Starting to apply cloud masks."
-  # #     )
-  # #
-  # #     # index which is TRUE for SCL products, FALSE for others
-  # #     names_warped_exp_scl_idx <- theia2r_getElements(s2names$warped_names_exp, format = "data.frame")$prod_type == "SCL"
-  # #     names_warped_req_scl_idx <- theia2r_getElements(s2names$warped_names_req, format = "data.frame")$prod_type == "SCL"
-  # #     # index which is TRUE for products to be atm. masked, FALSE for others
-  # #     names_warped_tomask_idx <- if ("SCL" %in% pm$list_prods) {
-  # #       names_warped_req_scl_idx > -1
-  # #     } else {
-  # #       !names_warped_req_scl_idx
-  # #     }
-  # #
-  # #     # if SR outformat is different (because BOA was not required,
-  # #     # bur some indices are) launch s2_mask separately
-  # #     masked_names_infiles <- if (pm$clip_on_extent == TRUE) {
-  # #       s2names$warped_names_req[names_warped_tomask_idx & file.exists(s2names$warped_names_req)]
-  # #     } else {
-  # #       s2names$merged_names_req[names_merged_tomask_idx & file.exists(s2names$merged_names_req)]
-  # #     }
-  # #     masked_names_infiles_sr_idx <- any(!is.na(pm$list_indices)) &
-  # #       !pm$index_source %in% pm$list_prods &
-  # #       sapply(masked_names_infiles, function(x) {
-  # #         theia2r_getElements(x)$prod_type == pm$index_source
-  # #       })
-  # #
-  # #     masked_names_out_nsr <- if (length(masked_names_infiles[!masked_names_infiles_sr_idx]) > 0) {
-  # #       trace_function(
-  # #         s2_mask,
-  # #         infiles = masked_names_infiles[!masked_names_infiles_sr_idx],
-  # #         maskfiles = if (pm$clip_on_extent == TRUE) {
-  # #           s2names$warped_names_exp[names_warped_exp_scl_idx]
-  # #         } else {
-  # #           s2names$merged_names_exp[names_merged_exp_scl_idx]
-  # #         },
-  # #         smooth = pm$mask_smooth,
-  # #         buffer = pm$mask_buffer,
-  # #         mask_type = pm$mask_type,
-  # #         max_mask = pm$max_mask,
-  # #         outdir = paths["out"],
-  # #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
-  # #         format = out_outformat,
-  # #         compress = pm$compression,
-  # #         subdirs = pm$path_subdirs,
-  # #         overwrite = pm$overwrite,
-  # #         parallel = pm$parallel,
-  # #         .log_message = .log_message, .log_output = .log_output,
-  # #         trace_files = s2names$out_names_new
-  # #       )
-  # #     } else {
-  # #       character(0)
-  # #     }
-  # #     masked_names_out_sr <- if (length(masked_names_infiles[masked_names_infiles_sr_idx]) > 0) {
-  # #       trace_function(
-  # #         s2_mask,
-  # #         infiles = masked_names_infiles[masked_names_infiles_sr_idx],
-  # #         maskfiles = if (pm$clip_on_extent == TRUE) {
-  # #           s2names$warped_names_exp[names_warped_exp_scl_idx]
-  # #         } else {
-  # #           s2names$merged_names_exp[names_merged_exp_scl_idx]
-  # #         },
-  # #         mask_type = pm$mask_type,
-  # #         smooth = pm$mask_smooth,
-  # #         buffer = pm$mask_buffer,
-  # #         max_mask = pm$max_mask,
-  # #         outdir = paths["out"],
-  # #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
-  # #         format = sr_masked_outformat,
-  # #         compress = pm$compression,
-  # #         subdirs = pm$path_subdirs,
-  # #         overwrite = pm$overwrite,
-  # #         parallel = pm$parallel,
-  # #         .log_message = .log_message, .log_output = .log_output,
-  # #         trace_files = s2names$out_names_new
-  # #       )
-  # #     } else {
-  # #       character(0)
-  # #     }
-  # #     masked_names_out <- c(masked_names_out_nsr, masked_names_out_sr)
-  # #     masked_names_notcreated <- c(
-  # #       attr(masked_names_out_nsr, "toomasked"),
-  # #       attr(masked_names_out_sr, "toomasked")
-  # #     )
-  # #   }
-  # # } # end of gdal_warp and s2_mask IF cycle
-  # #
-  # #
-  # ##### 10. Create RGB products #####
-  # cnes_lists_rgb <- list()
-  # if (sum(!file.exists(nn(cnes2names$rgb_names_new))) > 0) {
-  #   ## RGB ##
-  #   print_message(
-  #     type = "message",
-  #     date = TRUE,
-  #     i18n$t("Starting to make RGB.")
-  #   )
-  # 
-  #   dir.create(paths["rgb"], recursive = FALSE, showWarnings = FALSE)
-  # 
-  #   cnes_lists_rgb[["cnes"]] <- s2_rgb(
-  #     infiles = cnes2names$rgb_names_new,
-  #     rgblist = pm$rgb_out,
-  #     extent = pm$extent,
-  #     tilesdir = paths["tiles"],
-  #     mosaicdir = paths["mosaic"],
-  #     outdir = paths["rgb"],
-  #     resolution = 10
-  #   )
-  # }
-  # 
-  # ##### 11. Compute spectral indices #####
+  # } # end of gdal_warp and s2_mask IF cycle
+  #
+  #
+  ##### 10. Create RGB products #####
+  cnes_lists_rgb <- list()
+  if (sum(!file.exists(nn(cnes2names$rgb_names_new))) > 0) {
+    ## RGB ##
+    print_message(
+      type = "message",
+      date = TRUE,
+      i18n$t("Starting to make RGB.")
+    )
+
+    dir.create(paths["rgb"], recursive = FALSE, showWarnings = FALSE)
+
+    cnes_lists_rgb[["cnes"]] <- s2_rgb(
+      infiles = cnes2names$rgb_names_new,
+      project = pm$project_name,
+      rgblist = pm$rgb_out,
+      extent = pm$extent,
+      tilesdir = paths["tiles"],
+      mosaicdir = paths["mosaic"],
+      outdir = paths["rgb"],
+      resolution = 10
+    )
+  }
+
+  ##### 11. Compute spectral indices #####
   cnes_lists_indices <- list()
   # if (sum(!file.exists(nn(cnes2names$indices_names_list))) > 0) {
     print_message(
@@ -1065,17 +1051,17 @@ cnes <- function(param_list = NULL) {
 
   #
   # ##### 12. create thumbnails #####
-  #
+  # 
   # if (thumbnails == TRUE) {
   #   thumb_names_req <- names_out_created
-  #
+  # 
   #   if (length(thumb_names_req) > 0) {
   #     print_message(
   #       type = "message",
   #       date = TRUE,
   #       "Generating thumbnails."
   #     )
-  #
+  # 
   #     # define expected output names
   #     thumb_names_new <- file.path(
   #       dirname(thumb_names_req),
@@ -1095,7 +1081,7 @@ cnes <- function(param_list = NULL) {
   #         }
   #       )
   #     )
-  #
+  # 
   #     thumb_names_out <- trace_function(
   #       s2_thumbnails,
   #       infiles = thumb_names_req,
@@ -1104,89 +1090,86 @@ cnes <- function(param_list = NULL) {
   #     )
   #   }
   # } # end of thumbnails IF cycle
-  #
-  #
+
+
   # ##### 13. remove temporary files #####
-  # if (rmtmp == TRUE) {
-  #   unlink(tmpdir, recursive = TRUE)
-  # }
-  #
-  # # check if some files were not created
-  # names_cloudcovered <- nn(c(
-  #   if (exists("masked_names_notcreated")) {
-  #     masked_names_notcreated
-  #   },
-  #   if (exists("indices_names_notcreated")) {
-  #     indices_names_notcreated
-  #   }
-  # ))
-  # names_missing <- names_out[!file.exists(nn(names_out))]
-  # names_missing <- names_missing[!names_missing %in% names_cloudcovered]
-  # names_cloudcovered <- names_cloudcovered[!grepl(tmpdir, names_cloudcovered, fixed = TRUE)]
-  #
-  # # Add attributes related to files not created
-  # attr(names_out_created, "cloudcovered") <- names_cloudcovered
-  # attr(names_out_created, "missing") <- names_missing
-  #
-  # # Note down the list of non created files (#ignorePath)
-  # # Sometimes not all the output files are correctly created:
-  # # the main reason is the cloud coverage higher than the maximum allowed
-  # # value (argument "max_mask"), but also some other unexpected reasons could
-  # # happen, i.e. because of old name SAFE products which do not include all the tiles.
-  # # To prevent to try to create these files every time the function is called
-  # # with the same parameter file, if param_list is a path, this list is noted
-  # # in two hidden files ( one per file not created because of cloud coverage,
-  # # one other for all the other reasons) so to ignore them during next executions.
-  # # To try it again, delete the files or set overwrite = TRUE).
-  # if (length(names_missing) > 0) {
-  #   ignorelist_path <- gsub("\\.json$", "_ignorelist.txt", param_list)
-  #   if (is(param_list, "character")) {
-  #     write(names_missing, ignorelist_path, append = TRUE)
-  #   }
-  #   print_message(
-  #     type = "warning",
-  #     "Some files were not created:\n\"",
-  #     paste(names_missing, collapse = "\"\n\""), "\"",
-  #     if (is(param_list, "character")) {
-  #       paste0(
-  #         "\"\nThese files will be skipped during next executions ",
-  #         "from the current parameter file (\"", param_list, "\").\n",
-  #         "To try again to build them, remove the file \"",
-  #         ignorelist_path, "\"."
-  #       )
-  #     }
-  #   )
-  # }
-  # if (length(names_cloudcovered) > 0) {
-  #   cloudlist_path <- gsub("\\.json$", "_cloudlist.txt", param_list)
-  #   if (is(param_list, "character")) {
-  #     write(names_cloudcovered, cloudlist_path, append = TRUE)
-  #   }
-  #   print_message(
-  #     type = "message",
-  #     "Some files were not created ",
-  #     "because the cloud coverage was higher than \"max_mask\":\n\"",
-  #     paste(names_cloudcovered, collapse = "\"\n\""), "\"",
-  #     if (is(param_list, "character")) {
-  #       paste0(
-  #         "\"\nThe list of these files was written in a hidden file ",
-  #         "(\"", cloudlist_path, "\"), ",
-  #         "so to be skipped during next executions."
-  #       )
-  #     }
-  #   )
-  # }
-
-
-
-  # Exit
+  # # if (rmtmp == TRUE) {
+  # #   unlink(tmpdir, recursive = TRUE)
+  # # }
+  # #
+  # # # check if some files were not created
+  # # names_cloudcovered <- nn(c(
+  # #   if (exists("masked_names_notcreated")) {
+  # #     masked_names_notcreated
+  # #   },
+  # #   if (exists("indices_names_notcreated")) {
+  # #     indices_names_notcreated
+  # #   }
+  # # ))
+  # # names_missing <- names_out[!file.exists(nn(names_out))]
+  # # names_missing <- names_missing[!names_missing %in% names_cloudcovered]
+  # # names_cloudcovered <- names_cloudcovered[!grepl(tmpdir, names_cloudcovered, fixed = TRUE)]
+  # #
+  # # # Add attributes related to files not created
+  # # attr(names_out_created, "cloudcovered") <- names_cloudcovered
+  # # attr(names_out_created, "missing") <- names_missing
+  # #
+  # # # Note down the list of non created files (#ignorePath)
+  # # # Sometimes not all the output files are correctly created:
+  # # # the main reason is the cloud coverage higher than the maximum allowed
+  # # # value (argument "max_mask"), but also some other unexpected reasons could
+  # # # happen, i.e. because of old name SAFE products which do not include all the tiles.
+  # # # To prevent to try to create these files every time the function is called
+  # # # with the same parameter file, if param_list is a path, this list is noted
+  # # # in two hidden files ( one per file not created because of cloud coverage,
+  # # # one other for all the other reasons) so to ignore them during next executions.
+  # # # To try it again, delete the files or set overwrite = TRUE).
+  # # if (length(names_missing) > 0) {
+  # #   ignorelist_path <- gsub("\\.json$", "_ignorelist.txt", param_list)
+  # #   if (is(param_list, "character")) {
+  # #     write(names_missing, ignorelist_path, append = TRUE)
+  # #   }
+  # #   print_message(
+  # #     type = "warning",
+  # #     "Some files were not created:\n\"",
+  # #     paste(names_missing, collapse = "\"\n\""), "\"",
+  # #     if (is(param_list, "character")) {
+  # #       paste0(
+  # #         "\"\nThese files will be skipped during next executions ",
+  # #         "from the current parameter file (\"", param_list, "\").\n",
+  # #         "To try again to build them, remove the file \"",
+  # #         ignorelist_path, "\"."
+  # #       )
+  # #     }
+  # #   )
+  # # }
+  # # if (length(names_cloudcovered) > 0) {
+  # #   cloudlist_path <- gsub("\\.json$", "_cloudlist.txt", param_list)
+  # #   if (is(param_list, "character")) {
+  # #     write(names_cloudcovered, cloudlist_path, append = TRUE)
+  # #   }
+  # #   print_message(
+  # #     type = "message",
+  # #     "Some files were not created ",
+  # #     "because the cloud coverage was higher than \"max_mask\":\n\"",
+  # #     paste(names_cloudcovered, collapse = "\"\n\""), "\"",
+  # #     if (is(param_list, "character")) {
+  # #       paste0(
+  # #         "\"\nThe list of these files was written in a hidden file ",
+  # #         "(\"", cloudlist_path, "\"), ",
+  # #         "so to be skipped during next executions."
+  # #       )
+  # #     }
+  # #   )
+  # # }
+  # 
+  # 
+  # 
+  #### Exit ####
   print_message(
     type = "message",
     date = TRUE,
     i18n$t("Execution of CNES session terminated.")
   )
-  #
-  #   # # Return output file paths
-  #   # return(names_out_created)
-  #   return(NULL)
+
 }
