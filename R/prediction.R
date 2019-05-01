@@ -109,6 +109,13 @@ prediction <- function(param_list = NULL) {
   } else if (is(pm$extent, "Spatial")) {
     pm$extent <- st_as_sf(pm$extent)
   }
+  
+  # convert from GeoJSON to sf
+  if (is(pm$extent_mask, "character") | is(pm$extent_mask, "geojson")) {
+    pm$extent_mask <- st_read(pm$extent_mask, quiet = TRUE)
+  } else if (is(pm$extent_mask, "Spatial")) {
+    pm$extent_mask <- st_as_sf(pm$extent_mask)
+  }
 
   # check parallel (workaroud)
   # TODO add parallel to the GUI, and threat as a normal parameter
@@ -476,112 +483,158 @@ prediction <- function(param_list = NULL) {
       # indices from project
       path_project <- gsub("/indices", paste0("/projets/", pm$project_name), paths["indices"])
       
-      # read vector observation of presence/absence
-      # convert from GeoJSON to sf in EPSG=2154
-      obs <- sf::read_sf(pm$extent_pa, quiet = TRUE) %>% st_transform(2154)
-      data_obs <- as(obs, "Spatial")
-      
       # read raster and tif for prediction
       path_indices <- list.files(file.path(paste0(path_project, "/indices")),
                                  pattern = '\\.tif$',
                                  full.names = TRUE)
       path_tiles <- list.files(file.path(paste0(path_project, "/merged")),
-                               pattern = '\\SENTINEL2A_20180922_L2A_T31T_L93_MERGED_CROP_FRE_',
+                               pattern = '\\SENTINEL2A_([0-9]{8})_L2A_T31T_L93_MERGED_CROP_FRE_',
                                full.names = TRUE)
       paths <- c(path_indices, path_tiles)
-      preds <- stack(paths)
       
-      # Change names of stack layer with the name of indice
-      nmi <- gsub(
-        "\\_CALC_L93_CROP.tif", "",
-        gsub("\\SENTINEL2A_([0-9]{8})_L2A_T([0-9]{2})[A-Z]_", "", basename(path_indices))
-      )
-      nmt <- gsub(
-        "\\.tif$", "",
-        gsub(
-          "\\L93_MERGED_CROP_", "",
-          gsub("\\SENTINEL2A_([0-9]{8})_L2A_T([0-9]{2})[A-Z]_", "", basename(path_tiles)))
-      )
-      nm <- c(nmi, nmt)
-      names(preds) <- nm
+      # loop over date
+      dates <- unique(stringr::str_sub(gsub("\\SENTINEL2A_", "", basename(path_indices)), 1, 8))
       
-      # prepare data
-      d <- sdm::sdmData(formula = obs~.,
-                        train = data_obs, 
-                        predictors = preds
-      )
-      
-      # in the following example, we use 12 differents methods to fit the models.
-      # evaluates using 20 runs of doth 5-folds cross-validation and bootstrapping
-      # replication method
-      print_message(type = "message", date = TRUE, i18n$t("Find the Best Model with sdm."))
-      model1 <- suppressWarnings(
-        sdm::sdm(formula = obs~.,
-                 data = d, 
-                 methods = c('glm','gam','brt','svm','cart','mars','mda','rf','mlp','rbf','bioclim','maxlike'),
-                 replication = c('boot'), 
-                 n = 20
+      for (d in 1:length(dates)) {
+        # read vector observation of presence/absence
+        # convert from GeoJSON to sf in EPSG=2154
+        obs <- sf::read_sf(pm$extent_pa, quiet = TRUE) %>% st_transform(2154)
+        data_obs <- as(obs, "Spatial")
+        path_indices_date <- path_indices[grep(dates[d], path_indices)]
+        path_indices_date <- path_indices[grep(dates[d], path_indices)]
+        path_tiles_date <- path_tiles[grep(dates[d], path_tiles)]
+        paths <- c(path_indices_date, path_tiles_date)
+        preds <- stack(paths)
+        
+        # Change names of stack layer with the name of indice
+        nmi <- gsub(
+          "\\_CALC_L93_CROP.tif", "",
+          gsub("\\SENTINEL2A_([0-9]{8})_L2A_T([0-9]{2})[A-Z]_", "", basename(path_indices_date))
         )
-      )
-      print_message(type = "message", date = TRUE, i18n$t("Find Best Model are calculated"))
-      
-      # dates of prediction
-      rep <- paste0(pm$path_pred, "/", stringr::str_sub(gsub("\\SENTINEL2A_", "", basename(path_indices[1])), 1, 8))
-      dir.create(rep, showWarnings = FALSE, recursive = TRUE)
-      
-      if (raster::ncell(preds[[1]]) <= 1000000) {
-        print_message(type = "message", date = TRUE, i18n$t("Prediction with sdm are calculated, it take times..."))
-        predict1 <- predict(
-          model1,
-          newdata = preds,
-          filename = paste0(rep,'/sdm_predict.img')
+        nmt <- gsub(
+          "\\.tif$", "",
+          gsub(
+            "\\L93_MERGED_CROP_", "",
+            gsub("\\SENTINEL2A_([0-9]{8})_L2A_T([0-9]{2})[A-Z]_", "", basename(path_tiles_date)))
         )
-      } else {
-        print_message(type = "message", date = TRUE, i18n$t("Prediction with rf, it take times..."))
-        # assign raster values to training data
-        v_tot <- as.data.frame(raster::extract(preds, data_obs))
-        data_obs@data <- data.frame(data_obs@data, v_tot[match(rownames(data_obs@data), rownames(v_tot)),])
+        nm <- c(nmi, nmt)
+        names(preds) <- nm
         
-        # run rf model
-        rf_model <- randomForest::randomForest(x = data_obs@data[,2:ncol(data_obs@data)],
-                               y = as.factor(data_obs@data[,"obs"]),
-                               ntree = 501,
-                               importance=TRUE
-        )
+        # dates of prediction
+        rep <- paste0(pm$path_pred, "/", dates[d])
+        dir.create(rep, showWarnings = FALSE, recursive = TRUE)
         
-        # predict model
-        rf_predict <- predict(preds, 
-                       rf_model, 
-                       filename=paste0(rep,'/rf_predict.img'),
-                       type="prob", 
-                       index=1, 
-                       na.rm=TRUE, 
-                       # progress="window", 
-                       overwrite=TRUE
-        )
-        print_message(type = "message", date = TRUE, i18n$t("Prediction with rf are calculated."))
-        
-        # quantile of sigma
-        quant <- quantile(rf_predict, probs = sigma, type=7, names = FALSE)
-        
-        # raster to points
-        rf_predict_point <- raster::rasterToPoints(rf_predict, fun=function(x){x >= quant}, spatial = TRUE)
-        print_message(type = "message", date = TRUE, i18n$t("Transform rf_predict to SpatialPointsDataFrame."))
-        
-        rgdal::writeOGR(
-          obj=rf_predict_point,
-          dsn=rep,
-          layer="rf_predict_point",
-          overwrite_layer = TRUE,
-          driver="ESRI Shapefile"
-        )
-        print_message(type = "message", date = TRUE, i18n$t("File rf_predict_point are saved."))
-        
+        if (raster::ncell(preds[[1]]) <= 1000000) {
+          # prepare data
+          d <- sdm::sdmData(formula = obs~.,
+                            train = data_obs, 
+                            predictors = preds
+          )
+          
+          # in the following example, we use 12 differents methods to fit the models.
+          # evaluates using 20 runs of doth 5-folds cross-validation and bootstrapping
+          # replication method
+          print_message(type = "message", date = TRUE, i18n$t("Find the Best Model with sdm."))
+          sdm_model <- suppressWarnings(
+            sdm::sdm(formula = obs~.,
+                     data = d,
+                     methods = c('glm','gam','brt','svm','cart','mars','mda','rf','mlp','rbf','bioclim','maxlike'),
+                     replication = c('boot'),
+                     n = 20
+            )
+          )
+          
+          # Save sdm_model object to a file
+          saveRDS(sdm_model, file = paste0(rep, 'rf_model.rds'))
+          print_message(type = "message", date = TRUE, i18n$t("Find Best Model are calculated and saved"))
+          
+          # predict data
+          print_message(type = "message", date = TRUE, i18n$t("Prediction with sdm, it take times..."))
+          predict_sdm <- sdm::predict(
+            sdm_model,
+            newdata = preds,
+            filename = paste0(rep,'/predict_sdm.img')
+          )
+          
+          # ensemble based on a Weighted averaging that is weighted using TSS statistic 
+          # with threshold criterion number 2 which is max(Sensitivity+Specificity) 
+          # or max(TSS)
+          print_message(type = "message", date = TRUE, i18n$t("Prediction with ensemble, it take times..."))
+          predict_ens <- sdm::ensemble(
+            sdm_model,
+            newdata=preds,
+            filename=paste0(rep, '/predict_ens.img'),
+            setting=list(method='weighted',stat='TSS',opt=2)
+          )
+          
+        } else {
+          print_message(type = "message", date = TRUE, 
+                        paste(i18n$t("Prediction with RF, it take times..."), dates[d], "(", d, "/", length(dates), ")"))
+          # assign raster values to training data
+          v_tot <- as.data.frame(raster::extract(preds, data_obs))
+          data_obs@data <- data.frame(data_obs@data, v_tot[match(rownames(data_obs@data), rownames(v_tot)),])
+          # suppress all NA columns
+          data_obs@data <-Filter(function(x)!all(is.na(x)), data_obs@data)
+          
+          # run rf model
+          rf_model <- randomForest::randomForest(x = data_obs@data[,2:ncol(data_obs@data)],
+                                                 y = as.factor(data_obs@data[,"obs"]),
+                                                 ntree = 501,
+                                                 importance=TRUE
+          )
+          
+          # Save rf_model object to a file
+          saveRDS(rf_model, file = paste0(rep, '/rf_model.rds'))
+          print_message(type = "message", date = TRUE, 
+                        paste(i18n$t("Find the model with RF is calculated and saved - "), dates[d], "(", d, "/", length(dates), ")"))
+          # predict model
+          rf_predict <- predict(preds, 
+                                rf_model, 
+                                filename=paste0(rep,'/predict_rf.img'),
+                                type="prob", 
+                                index=1, 
+                                na.rm=TRUE, 
+                                # progress="window", 
+                                overwrite=TRUE
+          )
+          print_message(type = "message", date = TRUE, 
+                        paste(i18n$t("Prediction with RF are calculated - "), dates[d], "(", d, "/", length(dates), ")"))
+          
+          # quantile of sigma
+          quant <- quantile(rf_predict, probs = sigma, type=7, names = FALSE, ncells = NULL, na.rm = TRUE)
+          rf_predict_point <- NULL
+          form <- paste(
+            "rf_predict_point <- raster::rasterToPoints(rf_predict, fun=function(x){x >=", quant, "}, spatial = TRUE)"
+          )
+          
+          ### evalue le raster to points
+          eval(parse(text = substitute(form, list(form = form))))
+          # rf_predict_point <- raster::rasterToPoints(rf_predict, fun=function(x, q = quant){x >= q}, spatial = TRUE)
+          print_message(type = "message", date = TRUE, 
+                        paste(i18n$t("Transform rf_predict to SpatialPointsDataFrame - "), dates[d], "(", d, "/", length(dates), ")"))
+          
+          # intersect with extent
+          extent <- sp::spTransform(sf::as_Spatial(pm$extent), CRS(proj4string(rf_predict_point)))
+          rf_predict_point <- raster::intersect(rf_predict_point, extent)
+          
+          # if extent_mask exist intersect
+          extent_mask <- sp::spTransform(sf::as_Spatial(pm$extent_mask), CRS(proj4string(rf_predict_point)))
+          rf_predict_point <- raster::intersect(rf_predict_point, extent_mask)
+          
+          rgdal::writeOGR(
+            obj=rf_predict_point,
+            dsn=rep,
+            layer="rf_predict_point",
+            overwrite_layer = TRUE,
+            driver="ESRI Shapefile"
+          )
+          print_message(type = "message", date = TRUE, 
+                        paste(i18n$t("File rf_predict_point are saved - "), dates[d], "(", d, "/", length(dates), ")"))
+          
+        }
       }
     }
-      
-  }
-  
+  } 
 
   #### Exit ####
   print_message(

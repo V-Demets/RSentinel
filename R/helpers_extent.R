@@ -121,8 +121,8 @@ load_extent_vectfile_pa <- function() {
     helpText(em(
       p(i18n$t("Chose the vector file to be used as extent.")),
       p(
-        i18n$t("To upload a shapefile, select all the related files"),
-        i18n$t("(at most the .shp, .shx, .dbf and .prj ones must be present).")
+        i18n$t("To upload a geopackage, select the related file"),
+        i18n$t("(at most the .gpkg must be present).")
       )
     )),
     fileInput("path_vectfile_pa_sel",
@@ -152,8 +152,8 @@ load_extent_vectfile_mask <- function() {
     helpText(em(
       p(i18n$t("Chose the vector file to be used as extent.")),
       p(
-        i18n$t("To upload a shapefile, select all the related files"),
-        i18n$t("(at most the .shp, .shx, .dbf and .prj ones must be present).")
+        i18n$t("To upload a geopackage, select the related file"),
+        i18n$t("(at most the .gpkg must be present).")
       )
     )),
     fileInput("path_vectfile_mask_sel",

@@ -3,10 +3,10 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
   shiny, shinythemes, shinydashboard, shinyjs, shinyWidgets, leaflet, ggvis, ggrepel, dplyr, RColorBrewer, raster, gstat,
   rgdal, ggmap, ggplot2, reticulate, tools, leaflet.extras, pool, RPostgreSQL, devtools, mapedit, shiny.i18n, Cairo,
-  stringr, shinyFiles, data.table, jsonlite, geojsonio, geojsonlint, imager, DBI, SDMSelect, sdm, randomForest, snow, 
+  stringr, shinyFiles, data.table, jsonlite, geojsonio, geojsonlint, imager, DBI, sdm, randomForest, snow, 
   caret, purrr, tibble, magrittr
 )
-pacman::p_load_gh("hadley/tidyverse", "tidyverse/ggplot2", "tidyverse/dplyr", "r-spatial/sf", "jrowen/rhandsontable")
+pacman::p_load_gh("hadley/tidyverse", "tidyverse/ggplot2", "tidyverse/dplyr", "r-spatial/sf", "jrowen/rhandsontable", "pobsteta/shiny-cnes")
 
 mega <- 200
 options(shiny.maxRequestSize = mega * 1024^2)
@@ -88,16 +88,15 @@ jscode <- "shinyjs.closeWindow = function() { window.close(); }"
 
 # Define regular expressions to identify products
 def_regex <- list(
-  tile = list(regex = "SENTINEL([12][AC])\\_([0-9]{8})\\-([0-9]{6})\\-([0-9]{3})\\_L([1-3][A-C])\\_([A-Z])([0-9]{2})([A-Z]{3})\\_D"),
-  image = list(regex = "SENTINEL([12][AC])\\_([0-9]{8})\\-([0-9]{6})\\-([0-9]{3})\\_L([1-3][A-C])\\_([A-Z])([0-9]{2})([A-Z]{3})\\_D_V1-9"),
+  tile = list(regex = "SENTINEL([12][AC])\\_([0-9]{8})\\-([0-9]{6})\\-([0-9]{3})\\_L([1-3][A-C])\\_([A-Z])([0-9]{2})([A-Z]{3})"),
+  image = list(regex = "SENTINEL([12][AC])\\_([0-9]{8})\\-([0-9]{6})\\-([0-9]{3})\\_L([1-3][A-C])\\_([A-Z])([0-9]{2})([A-Z]{3})\\_[A-Z]_V[0-9]-[0-9]"),
   cloud = list(regex = "clouCover:")
 )
 
 # Define list of names of product tiles
 def_names <- list(
   sentinel2 = c(
-    "ATB_R1", "ATB_R2", "FRE_B11", "FRE_B12", "FRE_B2", "FRE_B3", "FRE_B4", "FRE_B5", "FRE_B6", "FRE_B7", "FRE_B8", "FRE_B8A",
-    "SRE_B12", "SRE_B2", "SRE_B3", "SRE_B4", "SRE_B5", "SRE_B6", "SRE_B7", "SRE_B8", "SRE_B8A"
+    "FRE_B2", "FRE_B3", "FRE_B4", "FRE_B5", "FRE_B6", "FRE_B7", "FRE_B8", "FRE_B8A", "FRE_B11", "FRE_B12"
   ),
   sentinel2_mask = c(
     "CLM_R1", "CLM_R2", "DFP_R1", "DFP_R2", "DTF_R1-D01", "DTF_R1-D02", "DTF_R1-D03", "DTF_R1-D04", "DTF_R1-D05",

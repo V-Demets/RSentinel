@@ -87,7 +87,8 @@ s2_merge <- function(infiles,
 
   msg <- NULL
 
-  warped <- list.files(warpedir, pattern = "tif")
+  warped <- stringr::str_replace(basename(infiles), 'MERGED', 'WARPED')
+  
   regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*", str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
 
   # export and crop as a RGB image at full resolution

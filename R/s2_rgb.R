@@ -369,7 +369,7 @@ s2_rgb <- function(infiles,
 
   # merge same date and same UTM
   if ("natural" %in% rgblist) {
-    warped <- list.files(outdir, pattern = "*D_RGB_L93_natural.tif")
+    warped <- list.files(outdir, pattern = "*_RGB_L93_natural.tif")
     if (length(warped) != 0) {
       regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*",
                             str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
@@ -398,7 +398,7 @@ s2_rgb <- function(infiles,
     }
   }
   if ("nearinfra" %in% rgblist) {
-    warped <- list.files(outdir, pattern = "*D_RGB_L93_nearinfra.tif")
+    warped <- list.files(outdir, pattern = "*_RGB_L93_nearinfra.tif")
     if (length(warped) != 0) {
       regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*", 
                             str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
@@ -427,7 +427,7 @@ s2_rgb <- function(infiles,
     }
   }
   if ("farinfra" %in% rgblist) {
-    warped <- list.files(outdir, pattern = "*D_RGB_L93_farinfra.tif")
+    warped <- list.files(outdir, pattern = "*_RGB_L93_farinfra.tif")
     if (length(warped) != 0) {
       regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*", 
                             str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))
@@ -456,7 +456,7 @@ s2_rgb <- function(infiles,
     }
   }
   if ("vegetation" %in% rgblist) {
-    warped <- list.files(outdir, pattern = "*D_RGB_L93_vegetation.tif")
+    warped <- list.files(outdir, pattern = "*_RGB_L93_vegetation.tif")
     if (length(warped) != 0) {
       regx <- unique(paste0(str_extract(basename(warped), "SENTINEL2A\\_([0-9]{8})"), "*_L2A*",
                             str_extract(basename(warped), "\\_T([0-9]{2})[A-Z]")))

@@ -227,14 +227,19 @@
       {"en": "Correlogram are calculated", "fr": "Les corrélogrammes ont été calculés"},
       {"en": "New data on regular grid are calculated", "fr": "Les données ont été caclculées sur la nouvelle grille"},
       {"en": "Spearman are calculated", "fr": "Spearman a été calculé"},
-      {"en": "Find Best Model are calculated", "fr": "Le meilleur modèle a été calculé"},
+      {"en": "Find Best Model are calculated and saved", "fr": "Le meilleur modèle a été calculé et sauvegardé"},
       {"en": "Find Best Model are saved", "fr": "Le meilleur modèle a été sauvegardé"},
-      {"en": "Prediction with sdm are calculated, it take times...", "fr": "La prédiction avec SDM a été calculée, ça prends du temps..."},
-      {"en": "Prediction with rf, it take times...", "fr": "La prédiction avec RF est en cours, ça prends du temps..."},
-      {"en": "Prediction with rf are calculated.", "fr": "La prédiction avec RF a été calculée."},
-      {"en": "Transform rf_predict to SpatialPointsDataFrame.", "fr": "Transforme rf_predict en SpatialPointsDataFrame."},
-      {"en": "File rf_predict_point are saved.", "fr": "Le fichier rf_predict_point a été sauvegardé."},
+      {"en": "Prediction with sdm, it take times...", "fr": "La prédiction avec SDM a été calculée, ça prends du temps..."},
+      {"en": "Prediction with RF, it take times...", "fr": "La prédiction avec RF est en cours, ça prends du temps..."},
+      {"en": "Prediction with RF are calculated - ", "fr": "La prédiction avec RF a été calculée - "},
+      {"en": "Transform rf_predict to SpatialPointsDataFrame - ", "fr": "Transforme rf_predict en SpatialPointsDataFrame - "},
+      {"en": "File rf_predict_point are saved - ", "fr": "Le fichier rf_predict_point a été sauvegardé - "},
       {"en": "Find the Best Model with sdm.", "fr": "Trouve les meilleurs modèles à partir de sdm."},
-      {"en": "Click on button: \u00a0", "fr": "Cliquer sur le bouton : \u00a0"}
+      {"en": "Click on button: \u00a0", "fr": "Cliquer sur le bouton : \u00a0"},
+      {"en": "Prediction with ensemble, it take times...", "fr": "La prédiction avec ensemble est en cours, ça prend du temps..."},
+      {"en": "Find the model with RF is calculated and saved - ", "fr": "Trouve le modèle à partir de RF et le sauvegarde - "},
+      {"en": "To upload a geopackage, select the related file", "fr": "Pour télécharger un géopaquet, sélectionner le fichier requis"},
+      {"en": "(at most the .gpkg must be present).", "fr": "(par défaut le géopaquet doit être présent)."},
+      {"en": "is not uncompressed.", "fr": "n'a pas été décompressé."}
       ]
 }

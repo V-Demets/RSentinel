@@ -770,20 +770,44 @@ preprocessing <- function(param_list = NULL) {
 
     # unzip files
     zipfile <- c(paste0(cnes_list, ".zip"))
-    for (l in zipfile) {
-      if (!dir.exists(paste0(pm$path_data, "/", file_path_sans_ext(l)))) {
-        print_message(
-          type = "message",
-          date = TRUE,
-          paste(i18n$t("Zip file"), l, i18n$t("is uncompressed."))
+    for (i in 1:length(zipfile)) {
+      print(paste0(pm$path_data, "/", stringr::str_sub(file_path_sans_ext(zipfile[i]), end = -3)))
+      tryCatch(if (!dir.exists(paste0(pm$path_data, "/", stringr::str_sub(file_path_sans_ext(zipfile[i]), end = -3)))) {
+        print("pouet01")
+        # list all files in zipfile
+        li <- utils::unzip(
+          zipfile = paste0(pm$path_data, "/", zipfile[i]),
+          list = TRUE
         )
+        print("pouet02")
+        # unzip just FRE_ and ALL.jpg files
         utils::unzip(
-          zipfile = paste0(pm$path_data, "/", l),
-          exdir = paste0(pm$path_data, "/", file_path_sans_ext(l)),
+          zipfile = paste0(pm$path_data, "/", zipfile[i]),
+          exdir = paste0(pm$path_data, "/", stringr::str_sub(file_path_sans_ext(zipfile[i]), end = -3)),
+          files = li$Name[grep('FRE_|ALL\\.jpg', li$Name)],
           junkpaths = TRUE,
           overwrite = FALSE
         )
-      }
+        print_message(
+          type = "message",
+          date = TRUE,
+          paste(i18n$t("Zip file"), zipfile[i], i18n$t("is uncompressed."))
+        )
+      },
+      error = function(e) {
+        print_message(
+          type = "message",
+          date = TRUE,
+          paste(i18n$t("Zip file"), zipfile[i], i18n$t("is not uncompressed."))
+        )
+        },
+      warning = function(w) {
+        print_message(
+          type = "message",
+          date = TRUE,
+          paste(i18n$t("Zip file"), zipfile[i], i18n$t("is not uncompressed."))
+        )
+      }) # end of tryCtach
     } # end of for
 
     # copy cnes2names$tiles_names_exp in project/tiles
@@ -803,7 +827,7 @@ preprocessing <- function(param_list = NULL) {
       )
       newf <- file.path(
         pm$path_tiles,
-        basename(gsub("_V[0-9].[0-9]_", "_TILES_", oldf))
+        basename(gsub("_[A-Z]_V[0-9].[0-9]_", "_TILES_", oldf))
       )
       file.copy(
         from = oldf,
@@ -901,103 +925,105 @@ preprocessing <- function(param_list = NULL) {
     )
   }
 
-  #   ###### 9. Apply mask #####"
-  #   # FIXME understand if this should be done before warping (if so, how to manage virtual/physical files?)
-  #   # masked_names <- file.path(paths["out"],
-  #   #                           if(pm$path_subdirs==TRUE){basename(dirname(warped_names[!names_merged_exp_scl_idx]))}else{""},
-  #   #                           gsub(paste0(warped_ext,"$"),out_ext,basename(warped_names[!names_merged_exp_scl_idx])))
-  #
-  #   if (!is.na(pm$mask_type) & length(s2names$masked_names_new) > 0) {
-  #     print_message(
-  #       type = "message",
-  #       date = TRUE,
-  #       "Starting to apply cloud masks."
-  #     )
-  #
-  #     # index which is TRUE for SCL products, FALSE for others
-  #     names_warped_exp_scl_idx <- theia2r_getElements(s2names$warped_names_exp, format = "data.frame")$prod_type == "SCL"
-  #     names_warped_req_scl_idx <- theia2r_getElements(s2names$warped_names_req, format = "data.frame")$prod_type == "SCL"
-  #     # index which is TRUE for products to be atm. masked, FALSE for others
-  #     names_warped_tomask_idx <- if ("SCL" %in% pm$list_prods) {
-  #       names_warped_req_scl_idx > -1
-  #     } else {
-  #       !names_warped_req_scl_idx
-  #     }
-  #
-  #     # if SR outformat is different (because BOA was not required,
-  #     # bur some indices are) launch s2_mask separately
-  #     masked_names_infiles <- if (pm$clip_on_extent == TRUE) {
-  #       s2names$warped_names_req[names_warped_tomask_idx & file.exists(s2names$warped_names_req)]
-  #     } else {
-  #       s2names$merged_names_req[names_merged_tomask_idx & file.exists(s2names$merged_names_req)]
-  #     }
-  #     masked_names_infiles_sr_idx <- any(!is.na(pm$list_indices)) &
-  #       !pm$index_source %in% pm$list_prods &
-  #       sapply(masked_names_infiles, function(x) {
-  #         theia2r_getElements(x)$prod_type == pm$index_source
-  #       })
-  #
-  #     masked_names_out_nsr <- if (length(masked_names_infiles[!masked_names_infiles_sr_idx]) > 0) {
-  #       trace_function(
-  #         s2_mask,
-  #         infiles = masked_names_infiles[!masked_names_infiles_sr_idx],
-  #         maskfiles = if (pm$clip_on_extent == TRUE) {
-  #           s2names$warped_names_exp[names_warped_exp_scl_idx]
-  #         } else {
-  #           s2names$merged_names_exp[names_merged_exp_scl_idx]
-  #         },
-  #         smooth = pm$mask_smooth,
-  #         buffer = pm$mask_buffer,
-  #         mask_type = pm$mask_type,
-  #         max_mask = pm$max_mask,
-  #         outdir = paths["out"],
-  #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
-  #         format = out_outformat,
-  #         compress = pm$compression,
-  #         subdirs = pm$path_subdirs,
-  #         overwrite = pm$overwrite,
-  #         parallel = pm$parallel,
-  #         .log_message = .log_message, .log_output = .log_output,
-  #         trace_files = s2names$out_names_new
-  #       )
-  #     } else {
-  #       character(0)
-  #     }
-  #     masked_names_out_sr <- if (length(masked_names_infiles[masked_names_infiles_sr_idx]) > 0) {
-  #       trace_function(
-  #         s2_mask,
-  #         infiles = masked_names_infiles[masked_names_infiles_sr_idx],
-  #         maskfiles = if (pm$clip_on_extent == TRUE) {
-  #           s2names$warped_names_exp[names_warped_exp_scl_idx]
-  #         } else {
-  #           s2names$merged_names_exp[names_merged_exp_scl_idx]
-  #         },
-  #         mask_type = pm$mask_type,
-  #         smooth = pm$mask_smooth,
-  #         buffer = pm$mask_buffer,
-  #         max_mask = pm$max_mask,
-  #         outdir = paths["out"],
-  #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
-  #         format = sr_masked_outformat,
-  #         compress = pm$compression,
-  #         subdirs = pm$path_subdirs,
-  #         overwrite = pm$overwrite,
-  #         parallel = pm$parallel,
-  #         .log_message = .log_message, .log_output = .log_output,
-  #         trace_files = s2names$out_names_new
-  #       )
-  #     } else {
-  #       character(0)
-  #     }
-  #     masked_names_out <- c(masked_names_out_nsr, masked_names_out_sr)
-  #     masked_names_notcreated <- c(
-  #       attr(masked_names_out_nsr, "toomasked"),
-  #       attr(masked_names_out_sr, "toomasked")
-  #     )
-  #   }
-  # } # end of gdal_warp and s2_mask IF cycle
-  #
-  #
+
+
+  # ##### 9. Apply mask #####
+  # #   # FIXME understand if this should be done before warping (if so, how to manage virtual/physical files?)
+  # #   # masked_names <- file.path(paths["out"],
+  # #   #                           if(pm$path_subdirs==TRUE){basename(dirname(warped_names[!names_merged_exp_scl_idx]))}else{""},
+  # #   #                           gsub(paste0(warped_ext,"$"),out_ext,basename(warped_names[!names_merged_exp_scl_idx])))
+  # #
+  # #   if (!is.na(pm$mask_type) & length(s2names$masked_names_new) > 0) {
+  # #     print_message(
+  # #       type = "message",
+  # #       date = TRUE,
+  # #       "Starting to apply cloud masks."
+  # #     )
+  # #
+  # #     # index which is TRUE for SCL products, FALSE for others
+  # #     names_warped_exp_scl_idx <- theia2r_getElements(s2names$warped_names_exp, format = "data.frame")$prod_type == "SCL"
+  # #     names_warped_req_scl_idx <- theia2r_getElements(s2names$warped_names_req, format = "data.frame")$prod_type == "SCL"
+  # #     # index which is TRUE for products to be atm. masked, FALSE for others
+  # #     names_warped_tomask_idx <- if ("SCL" %in% pm$list_prods) {
+  # #       names_warped_req_scl_idx > -1
+  # #     } else {
+  # #       !names_warped_req_scl_idx
+  # #     }
+  # #
+  # #     # if SR outformat is different (because BOA was not required,
+  # #     # bur some indices are) launch s2_mask separately
+  # #     masked_names_infiles <- if (pm$clip_on_extent == TRUE) {
+  # #       s2names$warped_names_req[names_warped_tomask_idx & file.exists(s2names$warped_names_req)]
+  # #     } else {
+  # #       s2names$merged_names_req[names_merged_tomask_idx & file.exists(s2names$merged_names_req)]
+  # #     }
+  # #     masked_names_infiles_sr_idx <- any(!is.na(pm$list_indices)) &
+  # #       !pm$index_source %in% pm$list_prods &
+  # #       sapply(masked_names_infiles, function(x) {
+  # #         theia2r_getElements(x)$prod_type == pm$index_source
+  # #       })
+  # #
+  # #     masked_names_out_nsr <- if (length(masked_names_infiles[!masked_names_infiles_sr_idx]) > 0) {
+  # #       trace_function(
+  # #         s2_mask,
+  # #         infiles = masked_names_infiles[!masked_names_infiles_sr_idx],
+  # #         maskfiles = if (pm$clip_on_extent == TRUE) {
+  # #           s2names$warped_names_exp[names_warped_exp_scl_idx]
+  # #         } else {
+  # #           s2names$merged_names_exp[names_merged_exp_scl_idx]
+  # #         },
+  # #         smooth = pm$mask_smooth,
+  # #         buffer = pm$mask_buffer,
+  # #         mask_type = pm$mask_type,
+  # #         max_mask = pm$max_mask,
+  # #         outdir = paths["out"],
+  # #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
+  # #         format = out_outformat,
+  # #         compress = pm$compression,
+  # #         subdirs = pm$path_subdirs,
+  # #         overwrite = pm$overwrite,
+  # #         parallel = pm$parallel,
+  # #         .log_message = .log_message, .log_output = .log_output,
+  # #         trace_files = s2names$out_names_new
+  # #       )
+  # #     } else {
+  # #       character(0)
+  # #     }
+  # #     masked_names_out_sr <- if (length(masked_names_infiles[masked_names_infiles_sr_idx]) > 0) {
+  # #       trace_function(
+  # #         s2_mask,
+  # #         infiles = masked_names_infiles[masked_names_infiles_sr_idx],
+  # #         maskfiles = if (pm$clip_on_extent == TRUE) {
+  # #           s2names$warped_names_exp[names_warped_exp_scl_idx]
+  # #         } else {
+  # #           s2names$merged_names_exp[names_merged_exp_scl_idx]
+  # #         },
+  # #         mask_type = pm$mask_type,
+  # #         smooth = pm$mask_smooth,
+  # #         buffer = pm$mask_buffer,
+  # #         max_mask = pm$max_mask,
+  # #         outdir = paths["out"],
+  # #         tmpdir = file.path(tmpdir, "s2_mask"), rmtmp = rmtmp,
+  # #         format = sr_masked_outformat,
+  # #         compress = pm$compression,
+  # #         subdirs = pm$path_subdirs,
+  # #         overwrite = pm$overwrite,
+  # #         parallel = pm$parallel,
+  # #         .log_message = .log_message, .log_output = .log_output,
+  # #         trace_files = s2names$out_names_new
+  # #       )
+  # #     } else {
+  # #       character(0)
+  # #     }
+  # #     masked_names_out <- c(masked_names_out_nsr, masked_names_out_sr)
+  # #     masked_names_notcreated <- c(
+  # #       attr(masked_names_out_nsr, "toomasked"),
+  # #       attr(masked_names_out_sr, "toomasked")
+  # #     )
+  # #   }
+  # # } # end of gdal_warp and s2_mask IF cycle
+  # #
+  # #
   ##### 10. Create RGB products #####
   cnes_lists_rgb <- list()
   if (sum(!file.exists(nn(cnes2names$rgb_names_new))) > 0) {
@@ -1024,7 +1050,7 @@ preprocessing <- function(param_list = NULL) {
 
   ##### 11. Compute spectral indices #####
   cnes_lists_indices <- list()
-  # if (sum(!file.exists(nn(cnes2names$indices_names_list))) > 0) {
+  if (sum(!file.exists(unlist(nn(cnes2names$indices_names_list)))) > 0) {
     print_message(
       type = "message",
       date = TRUE,
@@ -1047,9 +1073,8 @@ preprocessing <- function(param_list = NULL) {
       overwrite = pm$overwrite,
       parallel = TRUE,
     )
-  # }
+  }
 
-  #
   # ##### 12. create thumbnails #####
   # 
   # if (thumbnails == TRUE) {
